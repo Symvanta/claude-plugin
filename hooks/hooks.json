@@ -1,0 +1,16 @@
+{
+  "description": "Symvanta: register the Symvanta code-graph MCP server and inject standing context at session start so the agent reaches for the graph tools instead of shell search. The only hook is SessionStart, which prints context once. No hook runs on any tool call, so Bash, Grep, Glob, Edit, and every other tool are never intercepted, delayed, or interrupted.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js"]
+          }
+        ]
+      }
+    ]
+  }
+}

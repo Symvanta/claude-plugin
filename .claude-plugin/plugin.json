@@ -1,0 +1,24 @@
+{
+  "name": "symvanta",
+  "version": "1.0.0",
+  "description": "Connects the Symvanta code-graph MCP server and steers agents to its tools instead of shell search. Bundles the MCP connection, a SessionStart context primer, a skill, and slash commands. No hooks intercept tool calls.",
+  "author": {
+    "name": "Symvanta",
+    "email": "info@symvanta.com"
+  },
+  "homepage": "https://symvanta.com",
+  "repository": "https://github.com/Symvanta/claude-plugin",
+  "license": "MIT",
+  "keywords": [
+    "symvanta",
+    "mcp",
+    "code-graph",
+    "code-search"
+  ],
+  "mcpServers": {
+    "symvanta": {
+      "type": "http",
+      "url": "https://mcp.symvanta.com/mcp"
+    }
+  }
+}
