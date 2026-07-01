@@ -9,7 +9,7 @@ This project is indexed by Symvanta. To **find and navigate** code, use the
 Symvanta MCP graph tools, not shell search: `find_node` / `locate` (mode:text) to
 locate a symbol or string, `relate` (kind:callers) / `relate` (kind:dependencies) /
 `relate` (kind:blast_radius) for relationships, `find_http_route` for endpoints,
-`list_file_symbols` for what's in a file, `map` for a compact whole-repo / subtree skeleton, `ask_codebase` for a behavior
+`list_file_symbols` for what's in a file, `map` for a compact whole-repo / subtree skeleton (`map` view:"architecture" for the module-level architecture map: Louvain clusters, hubs, cross-module coupling), `ask_codebase` for a behavior
 question (one call returns an answer plus citations). Do NOT `Grep` / `Glob` to find code in an indexed repo **even
 when you have it checked out locally**: that is exactly what `locate` (mode:text) /
 `find_node` replace. `locate` (mode:text) takes one term or several at once via
@@ -115,6 +115,7 @@ A superset of `init.usage.decision_matrix` (the in-session value from `init` is 
 | Full type hierarchy             | `relate` (kind:heritage)                                  |
 | Full call chain                 | `relate` (kind:chain)                                     |
 | Orient on a whole repo / subtree | `map`                                                    |
+| High-level module / architecture map | `map` (view:"architecture")                          |
 | Symbols in one file             | `list_file_symbols`                                       |
 | Cross-repo candidate scan       | `locate` (mode:codebase)                                  |
 | Config key / env var usage      | `locate` (mode:config)                                    |
