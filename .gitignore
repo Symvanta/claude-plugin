@@ -1,0 +1,6 @@
+/.idea/
+.DS_Store
+
+# Symvanta-internal maintenance script (regenerates SKILL.md from the canonical
+# ruleset in the sibling Symvanta repo); not part of the published plugin.
+/scripts/

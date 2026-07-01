@@ -1,0 +1,29 @@
+{
+  "description": "Symvanta hooks. SessionStart injects standing context once so the agent reaches for the graph tools. PreToolUse on Grep/Glob is a non-blocking augmenter (on by default): it asks the Symvanta graph which indexed symbols match the search term and adds them as context, while the search itself runs untouched. Auth reuses the Symvanta MCP token Claude Code already stored (it reads ONLY that entry's access token from the credentials file, never your Anthropic token; set SYMVANTA_MCP_TOKEN to supply your own instead, or SYMVANTA_GREP_AUGMENT=off to disable). It can only ADD context, never block, delay-to-failure, or interrupt a tool: every error or timeout is a clean pass-through. Only the search term (not file contents) is sent to the MCP server. No hook runs on Bash, Edit, or any other tool.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session-start.js"]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/grep-augment.js"],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
