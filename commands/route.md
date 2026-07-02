@@ -1,7 +1,7 @@
 ---
 description: Find the handler for an HTTP route by method and path, then offer to open or trace it.
 argument-hint: [METHOD /path]
-allowed-tools: mcp__symvanta__find_http_route, mcp__symvanta__find_node
+allowed-tools: mcp__plugin_symvanta_symvanta__find_http_route, mcp__plugin_symvanta_symvanta__find_node, Read
 ---
 
 Find the handler for this HTTP route:

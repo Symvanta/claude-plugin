@@ -1,6 +1,6 @@
 {
   "name": "symvanta",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Connects the Symvanta code-graph MCP server and steers agents to its tools instead of shell search: the MCP connection, a SessionStart context primer, a skill, slash commands, read-only subagents, and a non-blocking Grep/Glob augmenter (on by default; SYMVANTA_GREP_AUGMENT=off disables it).",
   "author": {
     "name": "Symvanta",
@@ -17,10 +17,18 @@
     "agents",
     "subagents"
   ],
+  "userConfig": {
+    "mcpUrl": {
+      "type": "string",
+      "title": "Symvanta MCP server URL",
+      "description": "The Symvanta code-graph MCP endpoint, as a full URL including the /mcp path and no trailing slash (e.g. https://mcp.example.com/mcp). Keep the default for Symvanta Cloud; override it for a self-hosted, staging, or on-prem server.",
+      "default": "https://mcp.symvanta.com/mcp"
+    }
+  },
   "mcpServers": {
     "symvanta": {
       "type": "http",
-      "url": "https://mcp.symvanta.com/mcp"
+      "url": "${user_config.mcpUrl}"
     }
   }
 }

@@ -65,6 +65,7 @@ open a file the graph already located.
 | HTTP route handler by method+path  | `find_http_route`                   |
 | Symbols in one file                | `list_file_symbols`                 |
 | Orient on a repo / subtree         | `map`                               |
+| High-level module / architecture map | `map` (view:"architecture")       |
 
 Pick the one tool that matches the question shape; most questions are a single
 call. `ask_codebase` returns a synthesized answer plus file citations in one

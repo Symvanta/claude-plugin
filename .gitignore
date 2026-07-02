@@ -3,4 +3,6 @@
 
 # Symvanta-internal maintenance script (regenerates SKILL.md from the canonical
 # ruleset in the sibling Symvanta repo); not part of the published plugin.
-/scripts/
+/scripts/*
+# ...except the tool-prefix CI guard, which is repo tooling and safe to ship.
+!/scripts/check-tool-prefixes.mjs

@@ -3,8 +3,9 @@
 One-step setup for working in a [Symvanta](https://symvanta.com)-indexed
 codebase. Installing this plugin:
 
-- registers the Symvanta MCP server (`https://mcp.symvanta.com/mcp`, OAuth on
-  first connection), so you do not edit `.mcp.json` by hand;
+- registers the Symvanta MCP server (default `https://mcp.symvanta.com/mcp`,
+  configurable for on-prem / self-hosted, OAuth on first connection), so you do
+  not edit `.mcp.json` by hand;
 - injects standing context once at the start of every session so the agent
   reaches for the Symvanta code-graph tools instead of shell search;
 - ships a `symvanta` skill with the full tool decision matrix and conventions;
@@ -23,6 +24,19 @@ remember tool names:
 - `/symvanta:route [METHOD /path]`: find the handler for an HTTP route.
 - `/symvanta:status`: connection and index health snapshot (project,
   repositories, freshness, edge counts).
+- `/symvanta:architecture`: high-level module map (Louvain functional modules,
+  PageRank hubs, cross-module coupling, and the repo-wide load-bearing functions)
+  via `map` view:"architecture".
+- `/symvanta:scope [symbol or change]`: pre-flight scope/impact estimate before
+  you size a change (`estimate_scope`).
+- `/symvanta:branch [name | clear]`: pin this session's reads to a tracked
+  feature/RFC branch, or clear the pin (`ref`).
+- `/symvanta:working-tree`: overlay your uncommitted edits so the graph reflects
+  changes you have not pushed (`ref` op:"index_working_tree").
+- `/symvanta:tests [symbol]`: find the tests that cover a symbol
+  (`list_tests_for`).
+- `/symvanta:recent [path]`: recently changed files and recent commits
+  (`history`).
 
 ## Install
 
@@ -36,6 +50,26 @@ In Claude Code:
 Sign in with OAuth when prompted on first connection. Your workspace's
 Getting Started page in the Symvanta dashboard shows the exact marketplace URL
 for your account.
+
+## Configuration
+
+The plugin points at Symvanta Cloud (`https://mcp.symvanta.com/mcp`) by default,
+so Cloud users configure nothing. To point at a different Symvanta server, set
+the **Symvanta MCP server URL** (`mcpUrl`) plugin option: accept or change it
+when you enable the plugin, or later via the `/plugin` interface
+(Symvanta -> configure). Leave it blank to fall back to the Cloud default.
+
+Use the **full endpoint URL including the `/mcp` path, with no trailing slash**,
+for example `https://mcp.your-company.com/mcp`. A bare host or a trailing slash
+will fail to connect.
+
+**Authentication.** Every Symvanta MCP server (Cloud, staging, or on-prem)
+advertises its own OAuth endpoints, so Claude Code signs you in with OAuth on
+first connection whatever URL `mcpUrl` points at, nothing to configure in the
+plugin. On-prem supports the same OAuth flow: its gateway completes sign-in
+against your Symvanta cloud / license and the server verifies the issued token.
+Static API-key / bearer-token auth also exists for headless automation, but that
+is configured on the server or in your own MCP settings, not in this plugin.
 
 ## Updating
 
@@ -148,8 +182,9 @@ flowchart TD
 hooks/hooks.json             SessionStart + PreToolUse(Grep|Glob) wiring
 hooks/session-start.js       standing-context injector
 hooks/grep-augment.js        non-blocking Grep/Glob augmenter
-commands/                    slash commands (ask, blast, trace, route, status)
+commands/                    slash commands (ask, blast, trace, route, status, architecture, scope, branch, working-tree, tests, recent)
 skills/symvanta/SKILL.md     tool decision matrix and conventions
+scripts/                     sync-skill.mjs (SKILL from source) + check-tool-prefixes.mjs (CI guard)
 ```
 
 ## License

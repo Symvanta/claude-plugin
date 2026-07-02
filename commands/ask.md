@@ -1,7 +1,7 @@
 ---
 description: Ask a behavior question about the indexed codebase (how does X work, why does Y happen, what triggers Z). Routes to Symvanta ask_codebase and returns a synthesized answer with file citations.
 argument-hint: [question]
-allowed-tools: mcp__symvanta__init, mcp__symvanta__ask_codebase
+allowed-tools: mcp__plugin_symvanta_symvanta__init, mcp__plugin_symvanta_symvanta__ask_codebase, mcp__plugin_symvanta_symvanta__find_node, mcp__plugin_symvanta_symvanta__relate, mcp__plugin_symvanta_symvanta__find_http_route, Read
 ---
 
 Answer this behavior question using the Symvanta code graph. Do not grep or read files by hand to reconstruct the answer:

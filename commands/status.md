@@ -1,6 +1,6 @@
 ---
 description: "Symvanta connection and index health snapshot: attached project, indexed repositories, freshness, and graph edge counts."
-allowed-tools: mcp__symvanta__init, mcp__symvanta__freshness, mcp__symvanta__list_repositories, Bash, Read
+allowed-tools: mcp__plugin_symvanta_symvanta__init, mcp__plugin_symvanta_symvanta__freshness, mcp__plugin_symvanta_symvanta__list_repositories, Bash, Read
 ---
 
 Report the Symvanta connection and index health for this workspace.

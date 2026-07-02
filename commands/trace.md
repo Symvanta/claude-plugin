@@ -1,7 +1,7 @@
 ---
 description: "Trace how a function or symbol works: its full call chain, callers, and dependencies, using the Symvanta graph instead of reading files by hand."
 argument-hint: [symbol]
-allowed-tools: mcp__symvanta__find_node, mcp__symvanta__relate
+allowed-tools: mcp__plugin_symvanta_symvanta__find_node, mcp__plugin_symvanta_symvanta__relate, Read
 ---
 
 Trace the execution path of:

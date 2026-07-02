@@ -1,7 +1,7 @@
 ---
 description: Blast-radius safety check before editing a symbol. Shows what would break across files, layers, and repositories so you know whether a change is isolated before you touch it.
 argument-hint: [symbol or path:symbol]
-allowed-tools: mcp__symvanta__find_node, mcp__symvanta__relate
+allowed-tools: mcp__plugin_symvanta_symvanta__find_node, mcp__plugin_symvanta_symvanta__relate
 ---
 
 Assess the blast radius of this symbol before any edit:
