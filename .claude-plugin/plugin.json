@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "symvanta",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Connects the Symvanta code-graph MCP server and steers agents to its tools instead of shell search: the MCP connection, a SessionStart context primer, a skill, slash commands, read-only subagents, and a non-blocking Grep/Glob augmenter (on by default; SYMVANTA_GREP_AUGMENT=off disables it).",
   "author": {
     "name": "Symvanta",

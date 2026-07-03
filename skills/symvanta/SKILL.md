@@ -120,6 +120,9 @@ A superset of `init.usage.decision_matrix` (the in-session value from `init` is 
 | Cross-repo candidate scan       | `locate` (mode:codebase)                                  |
 | Config key / env var usage      | `locate` (mode:config)                                    |
 | Existing tests for a symbol     | `list_tests_for`                                          |
+| Impact of a whole diff / branch (what breaks, tests to run, affected routes, co-change reminders) | `diff_impact` (base/head optional; composes with `ref` op:"index_working_tree" for uncommitted edits) |
+| Record an architecture decision (the WHY) on a symbol, file, or project | `adr` (op:"record") |
+| Read past decisions before changing code | `adr` (op:"list"); `find_node` attaches a node's decisions automatically |
 | Pre-flight scope estimate       | `estimate_scope`                                          |
 | Raw file/dir/grep/blame/diff    | `source` (op: read|list|grep|tree|stat|blame|diff)        |
 | Commit history / recently changed | `history` (op: commits|commit|recently_changed)        |
@@ -187,6 +190,11 @@ in the response). Skip only when the symbol was just created (no callers),
 the task names every file to touch, or the change is ABI-compatible (new
 param with a default value).
 
+Before changing a symbol, also read its attached `decisions` (find_node
+returns them automatically): a recorded architecture decision may forbid or
+constrain the change you are about to make. Supersede a decision explicitly
+with `adr` (op:"update") rather than silently violating it.
+
 **Sequencing rule.** In any
 session where you have used Symvanta, your first `Edit` / `MultiEdit` on an
 existing symbol should be preceded by a `relate` (kind:blast_radius) (or
@@ -210,6 +218,15 @@ After editing a symbol:
 3. For database writes, `locate` (mode:config, query: <table_name>) to
    catch other writers in raw SQL / ORM strings the graph doesn't link
    through method-call edges.
+4. After a MULTI-FILE change (or before merging a branch), one `diff_impact`
+   call replaces per-symbol blast_radius loops: it diffs base..head, unions
+   the blast radius, and lists tests to run, affected endpoints, and
+   co-change reminders (files that historically change with your diff but
+   are untouched). For uncommitted edits, run `ref` (op:"index_working_tree")
+   first, then `diff_impact` with no shas.
+5. When the change embodies a non-obvious decision (a constraint, a rejected
+   alternative, a "never do X here"), record it: `adr` (op:"record") with the
+   symbolPath from find_node. Future agents see it before touching the code.
 
 **Index lags your edits.** Verify these claims against the live file via
 local `Read`, not the indexed revision. If
@@ -315,6 +332,7 @@ These reflect Symvanta's indexed state, not local HEAD, so they tell you somethi
 - Pass `includeSource: true` to `find_node` only when source is needed (default false).
 - When `find_node` returns `{ resolved: false, candidates }`, the index has no high-confidence match. Pick a candidate or narrow the selector; do not treat a low-confidence guess as the answer.
 - `confidence: "high"` can still be the wrong symbol kind. `relate({ kind: "implementers", selector: "VectorRepository" })` may select a property named `vectorRepository` (lowercase) with high confidence. Verify `node.kind` matches what you asked for (interface vs property, class vs function) before acting.
+- Separately from selector-resolution confidence, each `relate` caller/dependency ROW may carry its own `confidence`: the provenance tier of the graph edge behind the row. `"high"` = compiler-grade (SCIP call/import/reference), `"medium"` = framework-detected or heuristic structural match (route wiring, IoC/DI pair, polymorphic fan-out), `"low"` = string-heuristic match (cross-repo URL/table, event channel), `"correlational"` = git co-change only. Treat `low` / `correlational` rows as leads to verify, not proven call paths; absent means the row predates the tiering.
 - Repository IDs come in two shapes: base62 strings (`apcwr9`, `jmD7xn` from `init`, `find_node`, `freshness`) and numeric IDs (`564`, `684` from `estimate_scope`, `locate` (mode:codebase)). Both are opaque. Pass base62 IDs back when a tool asks for `repositoryId`; numeric IDs are internal.
 - Test symbols are excluded from search by default. Mention test/spec/describe/it/should/expect/mock, or pass `kind: "test_case"`, to opt in.
 - When `ask_codebase` returns `sufficient_to_answer: false`, the `notice` field lists specific gaps. Use it to choose follow-up queries instead of guessing.
