@@ -4,336 +4,254 @@ description: How to navigate an indexed codebase with the Symvanta MCP tools. Lo
 ---
 
 ## Symvanta MCP
-
 This project is indexed by Symvanta. To **find and navigate** code, use the
-Symvanta MCP graph tools, not shell search: `find_node` / `locate` (mode:text) to
-locate a symbol or string, `relate` (kind:callers) / `relate` (kind:dependencies) /
-`relate` (kind:blast_radius) for relationships, `find_http_route` for endpoints,
-`list_file_symbols` for what's in a file, `map` for a compact whole-repo / subtree skeleton (`map` view:"architecture" for the module-level architecture map: Louvain clusters, hubs, cross-module coupling), `ask_codebase` for a behavior
-question (one call returns an answer plus citations). Do NOT `Grep` / `Glob` to find code in an indexed repo **even
-when you have it checked out locally**: that is exactly what `locate` (mode:text) /
-`find_node` replace. `locate` (mode:text) takes one term or several at once via
-`queries: [...]` (up to 10, each tagged in the results): the in-graph
-replacement for `grep -E 'a|b|c'`, so a multi-term hunt is one call, not a shell grep.
+Symvanta graph tools, not shell search (see the decision matrix below). Do NOT
+`Grep` / `Glob` an indexed repo **even with a local checkout**: that is what
+`locate` (mode:text) / `find_node` replace. `locate` (mode:text) takes several
+terms at once via `queries: [...]` (up to 10, tagged in results): the in-graph
+replacement for `grep -E 'a|b|c'`, one call not a shell grep.
 
-Local `Read` is only for **viewing** a file you have already located (with a
-local checkout it is fine, and preferred over Symvanta's `source` tool). Reach
-for Symvanta's `source` tool (op: read|grep) when you have no local checkout
-(cloud agents, library-catalog dependencies) or need to pin to the indexed
-commit SHA. Rule of thumb: locating or understanding code goes through
-Symvanta; local `Read` only opens a file the graph already pointed you to.
+Local `Read` only VIEWS a file the graph already located (preferred over `source`
+when you have a clone). A local checkout does NOT license hand-tracing
+who-calls / what-depends / what-breaks / how-big (those stay `relate` queries), nor
+shelling out (`git`, `ls`, `find`, `cat`) to discover code (that is `locate` /
+`find_node`). A zip-uploaded repo has no clonable remote, so any local checkout can
+be stale or absent and is never authoritative: rely on the graph.
 
-A local checkout is for VIEWING a file the graph already located. It is NOT
-license to answer who-calls / what-depends / what-breaks / how-big questions by
-hand-tracing source: those stay graph queries (`relate` (kind:callers),
-`relate` (kind:dependencies), `relate` (kind:blast_radius)) even with the repo checked out locally.
-It is also NOT license to shell out (`git`, `ls`, `find`, `cat`) to discover or
-explore the repo: locating code is `locate` (mode:text) / `find_node` / `locate` (mode:file),
-never a shell. And a zip-uploaded repository has no clonable remote, so any local
-checkout can be stale or absent and is never authoritative: rely on the graph and
-search tools.
+This doc is the pre-init cached copy. Once you call `init`, its `usage` block
+(`structuredContent.usage`) is the authoritative in-session routing guide;
+introspect it rather than this. The full usage block returns on every `init`
+call.
 
 ## Path convention
 
-`filePath` shapes vary by tool and field. Normalize before passing between calls:
-
-- `src/foo/bar.ts` (repo-relative, with `src/`): `locate` (mode:text), `find_node.selected.filePath`
-- `foo/bar.ts` (repo-relative, no `src/`): `locate` (mode:symbol), `find_node.node.filePath`, `list_file_symbols`
-- `Repo/src/foo/bar.ts` (repo-prefixed): `locate` (mode:config), `ask_codebase` citations
-
-To map to your local checkout: strip any leading `<RepoName>/`, then prepend `src/` if missing. Inputs accept either form.
-
-On a project with **multiple attached repositories**, a repo-prefixed path
-also selects which repository the single-repo `source` tool
-(op: read|list|grep|tree|stat|blame|diff) reads from: pass
-`filePath: "<RepoName>/src/foo.ts"` and you can skip the explicit
-`repository` argument. Omit both `repository` and a path prefix on a
-multi-repo project and the tool returns an error listing the available
-repositories to pick from.
+Every `filePath` in a response is repo-relative logical (e.g. `src/user/email.ts`),
+NOT `<repo>/<path>`. Map it to your local layout before reading; pass the logical
+form for `filePath` inputs too. On a **multi-repo** project, prefix a path with
+`<RepoName>/` to also select which repository the single-repo `source` tool reads
+from (skips the explicit `repository` arg); omit both prefix and `repository` and
+`source` returns an error listing the repos to pick from.
 
 ## First call
 
-- Call `init` at the start of the session. `repositoryCount > 0` means you're connected to a populated project; proceed.
-- The `init` response carries a `usage` block in `structuredContent` (`principle`, `behavior_questions`, `behavior_question_triggers`, `decision_matrix`, `pre_edit_checklist`, `anti_patterns`). It is the authoritative in-session routing guide; introspect it instead of relying solely on this doc. The sections below are a cached copy for pre-init reference.
-- If `repositoryCount === 0`, tell the user "no repositories are attached to your active Symvanta project" and ask them to attach one in the Symvanta dashboard. Do not silently fall back to grep over unrelated files.
-
-## Response hints
-
-Routing-critical tools (`locate`, `find_node`, `find_http_route`, `relate`, `ask_codebase`, `estimate_scope`) may attach a `next_steps: [{ tool, reason }]` array to `structuredContent` on empty results, partial answers, or unambiguous follow-ups. Follow these instead of guessing the next call: they enforce the graph -> text -> grep ordering (see "Behavior questions" below).
-
-## Preferred workflow
-
-1. `init` for project, repos, and index health
-2. `find_node` / `locate` (mode:text) to LOCATE a symbol or string; `ask_codebase` for a behavior question (see "Behavior questions" below)
-3. Local `Read` to view the returned filePath when you have the repo locally (otherwise the `source` tool, op:read). To find more code, go back to step 2 (`locate` (mode:text) / `find_node`), do not local-`Grep` the indexed repo.
+- Call `init` at session start. `repositoryCount > 0` means you're connected to a
+  populated project; proceed.
+- A tenant may hold several indexed projects (`init`'s `otherProjects`). Without
+  `projectId` / `repository`, tools fan out across ALL of them: the response has a
+  top-level `matchedProject` when every result resolved in one project, per-row when
+  they span projects, plus per-row `alsoInProjects` for a symbol in more than one.
+  Pass `repository` or `projectId` to scope to one; a repo outside the active
+  project is not unindexed.
+- If `repositoryCount === 0`, tell the user "no repositories are attached to your
+  active Symvanta project" and ask them to attach one in the dashboard. Do not
+  silently fall back to grep over unrelated files.
+- Routing-critical tools may attach `next_steps: [{ tool, reason }]` on empty /
+  partial results: follow it instead of guessing. It enforces graph -> text -> grep,
+  never graph -> grep.
 
 ## Behavior questions
 
-For a genuine behavior question (the user's prompt contains "why", "how does", "how is", "what triggers", "what causes", "what makes", "walk me through", "explain", "trace"), call `ask_codebase` directly: one call returns a synthesized answer plus citations (filePath + line bounds). For questions that span repositories use `ask_codebase` with `scope: "all"`. If the ask is really a pinpoint lookup (a specific symbol, an HTTP route, who-calls-X), use the targeted tool instead (`find_node`, `find_http_route`, `relate` (kind:callers)): no need to pay for synthesis.
+For a genuine behavior question (prompt has "why", "how does", "what triggers",
+"what causes", "walk me through", "explain", "trace"), call `ask_codebase`
+directly: one call returns a synthesized answer plus citations (filePath + line
+bounds). Cross-repo: `scope: "all"`. If the ask is really a pinpoint lookup (a
+symbol, a route, who-calls-X), use the targeted tool and skip synthesis.
 
-- Trust the answer and its citations as authoritative. Only `Read` a citation when you need verbatim source (you are about to quote or edit it).
-- If `sufficient_to_answer: false`, follow `notice.gaps` to choose ONE targeted follow-up (`find_node`, `relate` (kind:callers), `find_http_route`, etc.) and stop.
-- Fall back to `Grep`/`Read` only for files NOT in the citation list, and only when the question needs detail Symvanta did not surface.
-- If you are about to open your 3rd file in a row to "trace" something by hand, stop and call `ask_codebase` with the question phrased as the user asked it.
+- Trust the answer and its citations as authoritative. Only `Read` a citation to
+  quote or edit its verbatim source.
+- If `sufficient_to_answer: false`, follow `notice.gaps` to ONE targeted follow-up
+  and stop. `Grep` / `Read` only for uncited files.
+- About to open your 3rd file to hand-trace something? Stop and call `ask_codebase`.
 
 ## Delegating to subagents
 
-A subagent you spawn does NOT inherit this priming: the SessionStart context
-that steers the main session toward Symvanta never reaches a subagent, and the
-Symvanta tools may arrive there as deferred tools. So a generic subagent will
-default to `Grep`/`Glob`. When you delegate code search or understanding:
+A subagent you spawn does NOT inherit this priming (the SessionStart context never
+reaches it, and Symvanta tools may arrive deferred), so a generic subagent defaults
+to `Grep` / `Glob`. When you delegate code search or understanding:
 
-- Prefer the bundled `symvanta:symvanta-explorer` subagent (find / explain
-  code) or `symvanta:symvanta-tracer` (pre-edit blast-radius / impact check):
-  both are pre-primed and name the Symvanta tools in their own allowlist.
-- If you spawn a generic subagent instead, put the routing in its prompt: tell
-  it to load the Symvanta tools first (`ToolSearch` query "symvanta") and to use
-  `find_node` / `locate` / `relate` / `ask_codebase`, NOT `Grep`/`Glob`, on this
-  indexed repo.
+- Prefer the bundled `symvanta:symvanta-explorer` (find / explain) or
+  `symvanta:symvanta-tracer` (pre-edit blast-radius): both are pre-primed.
+- If you spawn a generic subagent, put the routing in its prompt: load the Symvanta
+  tools first (`ToolSearch` query "symvanta"), use `find_node` / `locate` /
+  `relate` / `ask_codebase`, NOT `Grep` / `Glob`, on this indexed repo.
 
 ## Decision matrix (intent -> tool)
 
-A superset of `init.usage.decision_matrix` (the in-session value from `init` is authoritative).
+Aligned with `init.usage.decision_matrix` (the in-session value is authoritative).
 
-
-| Intent                          | Tool                                                       |
-|---------------------------------|------------------------------------------------------------|
-| Behavior / "how does X work"    | `ask_codebase`                                            |
-| Cross-repo behavior             | `ask_codebase` (scope:"all")                              |
-| Look up a known symbol          | `find_node`                                               |
-| Search symbols by name / pattern| `locate` (mode:symbol)                                    |
-| Find a file by name fragment    | `locate` (mode:file)                                      |
-| Literal identifier or string    | `locate` (mode:text)                                      |
-| Several distinct terms at once  | `locate` (mode:text, queries:[...])                       |
-| Fuzzy / pattern lookup          | `locate` (mode:semantic)                                  |
-| Don't know which, just search   | `locate` (omit mode: text then semantic auto-route)       |
-| HTTP route handler              | `find_http_route`                                         |
-| Who calls X?                    | `relate` (kind:callers)                                   |
-| What breaks if X changes?       | `relate` (kind:blast_radius)                              |
-| What does X depend on?          | `relate` (kind:dependencies)                              |
-| What implements interface I?    | `relate` (kind:implementers)                              |
-| Full type hierarchy             | `relate` (kind:heritage)                                  |
-| Full call chain                 | `relate` (kind:chain)                                     |
-| Orient on a whole repo / subtree | `map`                                                    |
-| High-level module / architecture map | `map` (view:"architecture")                          |
-| Symbols in one file             | `list_file_symbols`                                       |
-| Cross-repo candidate scan       | `locate` (mode:codebase)                                  |
-| Config key / env var usage      | `locate` (mode:config)                                    |
-| Existing tests for a symbol     | `list_tests_for`                                          |
-| Impact of a whole diff / branch (what breaks, tests to run, affected routes, co-change reminders) | `diff_impact` (base/head optional; composes with `ref` op:"index_working_tree" for uncommitted edits) |
-| Record an architecture decision (the WHY) on a symbol, file, or project | `adr` (op:"record") |
-| Read past decisions before changing code | `adr` (op:"list"); `find_node` attaches a node's decisions automatically |
-| Pre-flight scope estimate       | `estimate_scope`                                          |
-| Raw file/dir/grep/blame/diff    | `source` (op: read|list|grep|tree|stat|blame|diff)        |
-| Commit history / recently changed | `history` (op: commits|commit|recently_changed)        |
-| Library package list / version  | `library` (op: packages|version)                         |
-| Read a feature / RFC branch     | `ref` (op:"use")  [revert with `ref` op:"clear"]        |
-| Query uncommitted working-tree edits | `ref` (op:"index_working_tree")                      |
+| Intent | Tool |
+|---|---|
+| Behavior / "how does X work" | `ask_codebase` |
+| Cross-repo behavior | `ask_codebase` (scope:"all") |
+| Look up a known symbol | `find_node` |
+| Search symbols by name / pattern | `locate` (mode:symbol) |
+| Find a file by name fragment | `locate` (mode:file) |
+| Literal identifier or string | `locate` (mode:text; queries:[...] for several) |
+| Fuzzy / pattern lookup | `locate` (mode:semantic) |
+| Don't know which, just search | `locate` (omit mode: text then semantic auto-route) |
+| HTTP route handler | `find_http_route` |
+| Who calls X? | `relate` (kind:callers) |
+| What breaks if X changes? | `relate` (kind:blast_radius) |
+| What does X depend on? | `relate` (kind:dependencies) |
+| What implements interface I? | `relate` (kind:implementers) |
+| Full type hierarchy | `relate` (kind:heritage) |
+| Full call chain | `relate` (kind:chain) |
+| Orient on a repo / subtree | `map` (view:"architecture" for the module map) |
+| Symbols in one file | `list_file_symbols` |
+| Cross-repo candidate scan | `locate` (mode:codebase) |
+| Config key / env var usage | `locate` (mode:config) |
+| Existing tests for a symbol | `list_tests_for` |
+| What a diff / branch breaks | `diff_impact` (composes with `ref` op:"index_working_tree") |
+| Record / read a decision (WHY) | `adr` (op:"record"|"list"); `find_node` attaches them |
+| Pre-flight scope estimate | `estimate_scope` |
+| Raw file/dir/grep/blame/diff | `source` |
+| Commit history / recently changed | `history` |
+| Library packages / version | `library` |
+| Read a feature / RFC branch | `ref` (op:"use"; "clear" reverts) |
+| Query uncommitted edits | `ref` (op:"index_working_tree") |
 
 ## Branch awareness
 
-Symvanta indexes feature / RFC branches, not just the default branch. By
-default every read resolves the default branch.
+Symvanta indexes feature / RFC branches; reads default to the default branch.
 
-- **Read a branch:** `ref({ op: "use", repository, branch })` pins this session so
-  later tool calls resolve that branch's latest indexed revision;
-  `ref({ op: "clear", repository })` reverts. The pin is per (tenant, repository),
-  holds the branch name (so it tracks new pushes without re-pinning), and an
-  explicit `commitSha` on any call still overrides it. `freshness` echoes
-  the active `pinnedBranch` / `pinnedSha`.
-- **Track first.** A branch must be tracked before `ref` (op:"use") resolves it. It
-  auto-tracks on an open same-repo GitHub PR (forks excluded); you can also add
-  it from the dashboard Branches panel or the local Claude Code SessionStart
-  hook. `ref` (op:"use") on an untracked / not-yet-indexed branch returns
-  `indexing_in_progress`: wait and retry, do not read an empty graph. Quota:
-  free 2, Pro 5 per seat, Enterprise unlimited.
-- **Uncommitted edits:** `ref({ op: "index_working_tree", repository, changedFiles: [{ path, content }], baseSha?, deletedPaths? })`
-  overlays your working-tree edits on `baseSha` (default: the tracked-branch /
-  default tip), indexes a synthetic ephemeral revision, and auto-pins the
-  session. Graph / text / symbol tools (`find_node`, `locate`,
-  `list_file_symbols`, `relate`, `ask_codebase`)
-  reflect the edits; the `source` tool and `locate` (mode:semantic) do NOT (the synthetic
-  ref is not a real git commit). `ref` (op:"clear") unpins.
-
-## Worked examples
-
-```
-// "Where does POST /api/users get handled?"
-find_http_route({ method: "POST", path: "/api/users" })
-  -> { filePath: "src/routes/users.ts", startLine: 42, endLine: 78 }
-  -> then Read src/routes/users.ts lines 42-78
-
-// "How does session refresh work?"
-ask_codebase({ question: "How does session refresh work?" })
-//   -> { answer: "...", citations: [{ filePath, startLine, endLine }, ...] }
-//   -> one call returns the answer plus citations; Read a citation only to
-//      see verbatim source.
-```
+- **Read a branch:** `ref({ op: "use", repository, branch })` pins this session's
+  reads to that branch's latest indexed revision; `ref({ op: "clear" })` reverts.
+  The pin is per (tenant, repository), holds the branch name (tracks new pushes),
+  and a `commitSha` on any call overrides it. `freshness` echoes the active pin.
+- **Track first.** A branch must be tracked before `ref` (op:"use") resolves it:
+  auto on an open same-repo GitHub PR (no forks), or via the dashboard / SessionStart
+  hook. Untracked / not-yet-indexed returns `indexing_in_progress`: wait and retry.
+  Quota: free 2, Pro 5/seat, Enterprise unlimited.
+- **Uncommitted edits:** `ref({ op: "index_working_tree", repository, changedFiles: [{ path, content }] })`
+  overlays them on a synthetic auto-pinned revision. Graph / text / symbol tools
+  reflect the edits; `source` and `locate` (mode:semantic) do NOT (it is not a real
+  git commit). `ref` (op:"clear") unpins.
 
 ## Before editing OR estimating scope
 
-This fires the moment you *size* a change, not only when you edit it. Before you
-call a change "easy", "a one-liner", "just wiring", or give any effort / risk
-estimate: run `relate` (kind:blast_radius) on the symbol(s) you would touch and
-`relate` (kind:callers) / `relate` (kind:dependencies) for the coupling. Comparing two
-implementations (does B implement A's surface)? `list_file_symbols` both and
-diff the method lists. Never extrapolate scope from one or two spot-checks;
-`estimate_scope` is the pre-flight for multi-file work. Scope / impact triggers
-in the prompt ("is this easy", "one-liner", "how big", "what would it take",
-"what breaks", "can we just", "is it safe to change") route to `estimate_scope`
-/ `relate` (kind:blast_radius) / `relate` (kind:callers) BEFORE you answer or plan.
+This fires the moment you *size* a change, not only when you edit. Before you call a
+change "easy", "a one-liner", "just wiring", or give any effort / risk estimate: run
+`relate` (kind:blast_radius) on the symbol(s) you'd touch, plus `relate`
+(kind:callers|dependencies) for coupling. Comparing two implementations? `list_file_symbols`
+both and diff the method lists. `estimate_scope` is the pre-flight for multi-file
+work. Scope triggers in the prompt ("is this easy", "how big", "what breaks", "can
+we just", "is it safe to change") route to `estimate_scope` / `relate` BEFORE you
+answer or plan.
 
-Before changing any symbol, run `relate` (kind:blast_radius) on it. Stop and confirm
-scope with the user if the result spans more than ~5 files, crosses
-architectural layers, or includes cross-repo edges (`wide_blast_radius: true`
-in the response). Skip only when the symbol was just created (no callers),
-the task names every file to touch, or the change is ABI-compatible (new
-param with a default value).
+Stop and confirm scope with the user if blast_radius spans more than ~5 files,
+crosses architectural layers, or has cross-repo edges (`wide_blast_radius: true`).
+Skip only when the symbol was just created (no callers), the task names every file
+to touch, or the change is ABI-compatible (new param with a default). Also read a
+symbol's attached `decisions` (`find_node` returns them): a recorded ADR may
+forbid the change; supersede it with `adr` (op:"update"), don't silently violate it.
 
-Before changing a symbol, also read its attached `decisions` (find_node
-returns them automatically): a recorded architecture decision may forbid or
-constrain the change you are about to make. Supersede a decision explicitly
-with `adr` (op:"update") rather than silently violating it.
-
-**Sequencing rule.** In any
-session where you have used Symvanta, your first `Edit` / `MultiEdit` on an
-existing symbol should be preceded by a `relate` (kind:blast_radius) (or
-`estimate_scope`) call. If you reach for an edit without having run it, stop,
-run the check, and only then edit. The `/symvanta:blast` command runs the check
-on demand.
+**Sequencing rule.** In any session where you have used Symvanta, your first `Edit`
+on an existing symbol must be preceded by a `relate` (kind:blast_radius) (or
+`estimate_scope`) call. Reaching for an edit without it? Stop, run the check, then
+edit. `/symvanta:blast` runs it on demand.
 
 ## Verify after editing
 
-The decision matrix above is keyed by *intent*, not by *lifecycle*. After
-you change a symbol, the graph tools become verification tools: they tell
-you whether the change is actually isolated.
+The index lags your edits, so after changing a symbol the graph tools become
+verification tools. Verify claims against the live file via local `Read`, not the
+indexed revision: until `freshness.lastIndexedSha` matches your post-push HEAD,
+every MCP result describes pre-edit reality.
 
-After editing a symbol:
-
-1. `find_node({ selectors: [{ symbol, filePath }] })`: confirm the symbol
-   still resolves at the expected location. Catches accidental renames or
-   moves.
-2. `relate` (kind:callers) on it: confirm no caller you didn't intend to touch.
-   Pass `includeCrossRepo: true` if the symbol crosses repo boundaries.
-3. For database writes, `locate` (mode:config, query: <table_name>) to
-   catch other writers in raw SQL / ORM strings the graph doesn't link
-   through method-call edges.
-4. After a MULTI-FILE change (or before merging a branch), one `diff_impact`
-   call replaces per-symbol blast_radius loops: it diffs base..head, unions
-   the blast radius, and lists tests to run, affected endpoints, and
-   co-change reminders (files that historically change with your diff but
-   are untouched). For uncommitted edits, run `ref` (op:"index_working_tree")
-   first, then `diff_impact` with no shas.
-5. When the change embodies a non-obvious decision (a constraint, a rejected
-   alternative, a "never do X here"), record it: `adr` (op:"record") with the
-   symbolPath from find_node. Future agents see it before touching the code.
-
-**Index lags your edits.** Verify these claims against the live file via
-local `Read`, not the indexed revision. If
-`freshness.lastIndexedSha != local HEAD`, every MCP result describes
-pre-edit reality. Treat the index as stale until you see a `freshness`
-that matches your post-push HEAD.
+1. `find_node`: confirm the symbol still resolves at the expected location.
+2. `relate` (kind:callers): confirm no unintended caller (`includeCrossRepo: true`
+   across repo boundaries).
+3. For DB writes, `locate` (mode:config, query: <table_name>) to catch raw-SQL / ORM
+   writers the graph doesn't link through call edges.
+4. After a MULTI-FILE change (or before merging), one `diff_impact` replaces
+   per-symbol loops: it unions the blast radius and lists tests, affected endpoints,
+   and co-change reminders. For uncommitted edits, run `ref`
+   (op:"index_working_tree") first, then `diff_impact` with no shas.
+5. If the change embodies a non-obvious decision, record it: `adr` (op:"record")
+   with the symbolPath from `find_node`.
 
 ## Anti-patterns
 
-Abridged. The full list lives in `init.usage.anti_patterns` and is enforced at the tool level via `next_steps` hints on empty / partial results.
+Abridged; the full list lives in `init.usage.anti_patterns` and is enforced via
+`next_steps` hints. (The graph-not-grep principle above covers shelling out.)
 
-- DON'T shell `grep` / `Glob` over an indexed repo. Use `locate` (mode:text) (or `locate` (mode:semantic) for fuzzy intent). For several terms at once pass `locate` (mode:text, queries:[...]) instead of `grep -E 'a|b|c'`.
-- DON'T chain `find_node` -> `source` (op:read) -> manual grep for a behavior question. Call `ask_codebase`: one call returns the answer plus citations.
-- DON'T fall back to local `Grep` when a graph tool (`relate` (kind:callers) / `relate` (kind:dependencies) / `relate` (kind:implementers)) returns empty. Empty graph results are NOT evidence of a stale index. Chain graph -> text -> grep: call `locate` (mode:text) on the symbol name first; only reach for `Grep` if that also returns empty.
-- DON'T retry `locate` (mode:text) with synonyms when it returned empty. Call `locate` (mode:semantic) with the same query, or call `locate` with no mode to auto-route.
-- DON'T use the `source` tool over MCP when a local clone exists. Local `Read` is faster.
-- DON'T edit symbols returned by `relate` (kind:callers / dependencies / blast_radius / implementers) unless the task names them. That data is for comprehension.
-- DON'T skip `relate` (kind:blast_radius) before editing a shared symbol. A one-line change that silently breaks 20 callers in a sibling repo is not an isolated fix.
-- DON'T estimate a change's size / risk, or call it "easy" / "a wiring change", by reading the file and eyeballing call sites. That is a one-hop partial view that underestimates. Run `relate` (kind:blast_radius) + `relate` (kind:callers) (and a `list_file_symbols` diff when comparing implementations) FIRST, then estimate.
+- DON'T chain `find_node` -> `source` -> manual grep for a behavior question. One
+  `ask_codebase` call returns the answer plus citations.
+- DON'T fall back to `Grep` when a graph tool (`relate`) returns empty. Empty is
+  NOT evidence of a stale index. Chain graph -> text -> grep: `locate` (mode:text) on
+  the name first; only then `Grep`.
+- DON'T retry `locate` (mode:text) with synonyms when it returned empty. Call
+  `locate` (mode:semantic) with the same query, or `locate` with no mode.
+- DON'T use `source` over MCP when a local clone exists: local `Read` is faster.
+- DON'T edit symbols `relate` returned unless the task names them: that data is for
+  comprehension, not edit targets.
+- DON'T call a change "easy" by eyeballing call sites: run `relate` (blast_radius +
+  callers) FIRST. A one-line change that breaks 20 callers in a sibling repo is not
+  an isolated fix.
 
-## Error envelopes (what to do when you see each code)
+## Error envelopes
 
-You cannot attach repos, reindex, or change scope yourself. Those are
-dashboard actions the user does. Your job is to recognize the code,
-take the right local action, and tell the user when something needs
-their attention.
+You cannot attach repos, reindex, or change scope: those are dashboard actions the
+user does. Recognize the code, take the right local action, tell the user when they
+need to act.
 
-- `repository_not_indexed`: the repo isn't in the index yet. If you have a local clone, fall back to your own `Read` / `Grep` and proceed. Mention in your final answer that the repo isn't indexed in Symvanta so cross-repo signals (callers, library catalog) are missing.
-- `stale_index`: the indexed SHA is behind live HEAD. Proceed against the latest indexed revision and note the staleness in your answer. If exact reproducibility matters (PR review, bug reproduction), pass the suggested `commitSha` to pin to the indexed revision instead.
-- `file_not_found`: the file doesn't exist at the indexed SHA. Call `freshness` to check the index. If you have a local clone, re-check the path there (the file may have been added or renamed on a newer commit).
-- `repository_not_attached`: the repo name you passed isn't in the user's active project scope. Re-check the spelling and try `list_repositories` (no args) to see what's available. If the user expected it to be there, tell them and ask them to attach it via the dashboard.
-- `out_of_bounds`: your `startLine` / `endLine` exceed the file's `totalLines`. Drop the bounds or shrink them, then retry.
-- `file_too_large`: the file exceeds the per-call byte cap. Retry with `startLine` + `endLine` to read a subset.
+- `repository_not_indexed`: not in the index yet. With a local clone, fall back to
+  `Read` / `Grep`; note that cross-repo signals (callers, library catalog) are missing.
+- `stale_index`: indexed SHA behind live HEAD. Proceed against latest indexed and
+  note it; for exact reproducibility pass the suggested `commitSha`.
+- `file_not_found`: file absent at the indexed SHA. `freshness` to check; re-check
+  the path in a local clone (may be added / renamed on a newer commit).
+- `repository_not_attached`: the repo name isn't in the active project scope. Check
+  spelling, try `list_repositories`; else ask the user to attach it via dashboard.
+- `out_of_bounds`: `startLine` / `endLine` exceed `totalLines`. Drop or shrink, retry.
+- `file_too_large`: exceeds the per-call byte cap. Retry with `startLine` + `endLine`.
 
-## SHA sync (run once per repo at session start)
+## SHA sync (once per repo, if you have a local clone)
 
-Goal: decide whether to pass `commitSha` on Symvanta queries so your
-results match the local files you'd `Read`.
+To decide whether to pass `commitSha` so results match the files you'd `Read`:
+resolve the repo's local checkout (try `<cwd>/<repo_name>`, then
+`<cwd>/<owner>/<repo_name>`, then `<cwd>` if it's the only attached repo; else no
+clone), compare `git rev-parse HEAD` against `freshness` -> `lastIndexedSha`.
 
-Workspace shapes you'll see:
+- **Match:** don't pass `commitSha`; index and local agree.
+- **Local AHEAD** (index stale): for exact reproducibility (PR review, repro) pass
+  `commitSha: <indexedSha>`; else proceed and note the staleness.
+- **Local BEHIND** (you checked out an older commit): pass `commitSha: <localHead>`
+  so queries match what you'd `Read`.
 
-- **Single repo at workspace root** (`.git` directory at cwd).
-- **Multi-repo workspace** where the root is NOT a git repo and each
-  attached repository lives in a subdirectory (e.g.
-  `workspace/Symvanta/`, `workspace/Parser/`). `git` from cwd will
-  fail; resolve the per-repo path first.
-- **Cloud agent / no local clone**: skip this whole section; you have
-  nothing to sync against. Symvanta queries against latest indexed
-  revision are your only option.
+If `edgeCount === 0` (from `list_repositories` / `init`), the repo has no graph
+edges: `relate` silently returns empty (no error). Fall back to `locate` (mode:text)
+or `Grep` for caller-finding and tell the user it needs a reindex. Cloud agent / no
+clone: skip this section, query latest indexed.
 
-### Steps (per repository)
+## Source and footprint
 
-1. Resolve the local checkout directory for the repo. Try, in order:
-   a. `<cwd>/<repo_name>` (matches `init`'s `repositories[i].name`).
-   b. `<cwd>/<owner>/<repo_name>` (matches `fullName`).
-   c. `<cwd>` itself if `<cwd>/.git` exists and only one repo is attached.
-   d. If none of these resolve, treat this repo as no-local-clone for the session.
-2. Get the local HEAD: `git -C <localPath> rev-parse HEAD`.
-3. Get the indexed SHA: `freshness({ repository: <name> })` -> `lastIndexedSha`.
-4. Compare and decide for the session:
-   - **Match**: do not pass `commitSha`. Latest indexed = your HEAD; query results and local `Read` agree.
-   - **Local AHEAD of indexed** (you have newer commits than the index): index is stale. For exact reproducibility (PR review, bug repro), pass `commitSha: <indexedSha>`. For general "what does this code do" work, proceed without `commitSha` and note the staleness in your final answer.
-   - **Local BEHIND indexed** (rare: you deliberately checked out an older commit): pass `commitSha: <localHead>` on Symvanta queries so they match what you'd `Read`. Otherwise the index will reference symbols / files that don't exist at your local HEAD.
-
-5. Check `edgeCount` from `list_repositories` (or `init`'s per-repo data). If `edgeCount === 0`, the repo has no graph edges indexed: `relate` (kind:callers / dependencies / blast_radius / implementers / chain) will silently return empty (no error, no warning). Fall back to `locate` (mode:text) or local `Grep` for caller-finding on that repo. Tell the user the repo needs a reindex if they're relying on graph traversal.
-
-Cache the per-repo `{ localPath, localHead, indexedSha, edgeCount, decision }`
-for the session. Don't re-check per query.
-
-## Token and latency footprint
-
-| Tool             | Tokens out  | Latency   | When to use                          |
-|------------------|-------------|-----------|--------------------------------------|
-| `init`          | ~1k         | ~300ms    | Once per session                     |
-| `find_node`     | ~500/node   | ~200ms    | You have a symbol name               |
-| `locate`        | ~1-3k       | ~400ms    | You have a literal string            |
-| `ask_codebase`  | ~3-5k       | ~2-4s     | Behavior question                    |
-| `source`        | size of file| ~200ms    | No local clone                       |
-
-`ask_codebase` does find + read + synthesis in one call: reach for it on a behavior question. Chain `find_node` -> `Read` instead when you need a precise location plus full control over the source read.
-
-## Source-access tools (fallback when you have no local clone)
-
-The single `source` tool covers all file / directory / raw-source access, selected by `op`:
-
-- `source({ op: "read", repository, filePath, startLine?, endLine? })`: read at the indexed commit.
-- `source({ op: "list", repository, path })`: enumerate files / subdirs.
-- `source({ op: "grep", repository, pattern, glob?, pathPrefix? })`: regex search across the indexed tree.
-- `source` with `op: "tree" | "stat" | "blame" | "diff"`: same fallback intent.
-
-**Known issue:** these ops can fail with "Repository ... has no indexed revision yet" even when `init` and `freshness` both confirm a `lastIndexedSha`. They read from an on-disk slot separate from the metadata store. If you hit this, fall back to local `Read` / `Grep`, and surface "the parser slot for this repo needs a redeploy" to the user. Metadata-only tools (`locate`, graph traversal, `ask_codebase`, `history`, `freshness`) are unaffected.
-
-## Indexed-state views (use even with a local clone)
-
-These reflect Symvanta's indexed state, not local HEAD, so they tell you something local git can't:
-
-- `freshness({ repository })`: `{ lastIndexedSha, isStale }`.
-- `history` (op: commits|commit|recently_changed).
+`ask_codebase` is the heavy call (~2-4s, ~3-5k tokens); everything else is
+sub-second. A single `source` tool covers raw access
+(op: read|list|grep|tree|stat|blame|diff) as the fallback when you have no local
+clone. Known issue: `source` ops can fail with "no indexed revision yet" even when
+`freshness` confirms a `lastIndexedSha` (a separate on-disk slot); fall back to
+local `Read` / `Grep` and tell the user the parser slot needs a redeploy.
+`freshness` and `history` reflect indexed state, not local HEAD, so they tell you
+what local git can't.
 
 ## Rules
 
-- All graph tools accept 1-10 selectors; pass multiple in one call instead of chaining.
-- Pass `includeSource: true` to `find_node` only when source is needed (default false).
-- When `find_node` returns `{ resolved: false, candidates }`, the index has no high-confidence match. Pick a candidate or narrow the selector; do not treat a low-confidence guess as the answer.
-- `confidence: "high"` can still be the wrong symbol kind. `relate({ kind: "implementers", selector: "VectorRepository" })` may select a property named `vectorRepository` (lowercase) with high confidence. Verify `node.kind` matches what you asked for (interface vs property, class vs function) before acting.
-- Separately from selector-resolution confidence, each `relate` caller/dependency ROW may carry its own `confidence`: the provenance tier of the graph edge behind the row. `"high"` = compiler-grade (SCIP call/import/reference), `"medium"` = framework-detected or heuristic structural match (route wiring, IoC/DI pair, polymorphic fan-out), `"low"` = string-heuristic match (cross-repo URL/table, event channel), `"correlational"` = git co-change only. Treat `low` / `correlational` rows as leads to verify, not proven call paths; absent means the row predates the tiering.
-- Repository IDs come in two shapes: base62 strings (`apcwr9`, `jmD7xn` from `init`, `find_node`, `freshness`) and numeric IDs (`564`, `684` from `estimate_scope`, `locate` (mode:codebase)). Both are opaque. Pass base62 IDs back when a tool asks for `repositoryId`; numeric IDs are internal.
-- Test symbols are excluded from search by default. Mention test/spec/describe/it/should/expect/mock, or pass `kind: "test_case"`, to opt in.
-- When `ask_codebase` returns `sufficient_to_answer: false`, the `notice` field lists specific gaps. Use it to choose follow-up queries instead of guessing.
+- All graph tools accept 1-10 selectors; pass multiple in one call, don't chain.
+- `find_node`: pass `includeSource: true` only when source is needed (default false).
+  `{ resolved: false, candidates }` means no high-confidence match: pick a candidate
+  or narrow, don't treat a low-confidence guess as the answer.
+- `confidence: "high"` can still be the wrong kind: `relate` (kind:implementers) on
+  `VectorRepository` may select a property `vectorRepository` with high confidence.
+  Verify `node.kind` matches what you asked for before acting.
+- Separately, each `relate` caller / dependency ROW may carry its own `confidence`
+  tier for the edge: `high` = compiler-grade (SCIP), `medium` = framework /
+  heuristic, `low` = string-heuristic, `correlational` = git co-change. Treat `low` /
+  `correlational` as leads to verify; absent means the row predates tiering.
+- Repository IDs come in two shapes, both opaque: base62 strings (`apcwr9` from
+  `init`, `find_node`, `freshness`) and numeric IDs (`564` from `estimate_scope`,
+  `locate` mode:codebase). Pass base62 back when a tool asks for `repositoryId`.
+- Test symbols are excluded from search by default. Mention
+  test/spec/describe/it/should/expect/mock, or pass `kind: "test_case"`, to opt in.
+- `locate` text rows carry nearest-symbol context only on the first row per file per
+  term, and omit `matchType` when it's a plain identifier match.
 - When index data contradicts a live file, trust the live file.
