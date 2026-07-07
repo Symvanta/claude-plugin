@@ -7,9 +7,9 @@ description: How to navigate an indexed codebase with the Symvanta MCP tools. Lo
 This project is indexed by Symvanta. To **find and navigate** code, use the
 Symvanta graph tools, not shell search (see the decision matrix below). Do NOT
 `Grep` / `Glob` an indexed repo **even with a local checkout**: that is what
-`locate` (mode:text) / `find_node` replace. `locate` (mode:text) takes several
-terms at once via `queries: [...]` (up to 10, tagged in results): the in-graph
-replacement for `grep -E 'a|b|c'`, one call not a shell grep.
+`locate` (mode:text) / `find_node` replace. `locate` (modes text and config)
+takes several terms at once via `queries: [...]` (up to 10, tagged in results):
+the in-graph replacement for `grep -E 'a|b|c'`, one call not a shell grep.
 
 Local `Read` only VIEWS a file the graph already located (preferred over `source`
 when you have a clone). A local checkout does NOT license hand-tracing
@@ -99,7 +99,7 @@ Aligned with `init.usage.decision_matrix` (the in-session value is authoritative
 | Orient on a repo / subtree | `map` (view:"architecture" for the module map) |
 | Symbols in one file | `list_file_symbols` |
 | Cross-repo candidate scan | `locate` (mode:codebase) |
-| Config key / env var usage | `locate` (mode:config) |
+| Config key / env var usage | `locate` (mode:config; queries:[...] for several keys) |
 | Existing tests for a symbol | `list_tests_for` |
 | What a diff / branch breaks | `diff_impact` (composes with `ref` op:"index_working_tree") |
 | Record / read a decision (WHY) | `adr` (op:"record"|"list"); `find_node` attaches them |
@@ -107,12 +107,12 @@ Aligned with `init.usage.decision_matrix` (the in-session value is authoritative
 | Raw file/dir/grep/blame/diff | `source` |
 | Commit history / recently changed | `history` |
 | Library packages / version | `library` |
-| Read a feature / RFC branch | `ref` (op:"use"; "clear" reverts) |
+| Read a feature branch | `ref` (op:"use"; "clear" reverts) |
 | Query uncommitted edits | `ref` (op:"index_working_tree") |
 
 ## Branch awareness
 
-Symvanta indexes feature / RFC branches; reads default to the default branch.
+Symvanta indexes feature branches; reads default to the default branch.
 
 - **Read a branch:** `ref({ op: "use", repository, branch })` pins this session's
   reads to that branch's latest indexed revision; `ref({ op: "clear" })` reverts.

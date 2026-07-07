@@ -30,7 +30,7 @@ remember tool names:
 - `/symvanta:scope [symbol or change]`: pre-flight scope/impact estimate before
   you size a change (`estimate_scope`).
 - `/symvanta:branch [name | clear]`: pin this session's reads to a tracked
-  feature/RFC branch, or clear the pin (`ref`).
+  feature branch, or clear the pin (`ref`).
 - `/symvanta:working-tree`: overlay your uncommitted edits so the graph reflects
   changes you have not pushed (`ref` op:"index_working_tree").
 - `/symvanta:tests [symbol]`: find the tests that cover a symbol

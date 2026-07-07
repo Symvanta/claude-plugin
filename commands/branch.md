@@ -1,5 +1,5 @@
 ---
-description: Pin this session's Symvanta reads to a tracked feature/RFC branch (or clear the pin) so graph queries resolve that branch instead of the default.
+description: Pin this session's Symvanta reads to a tracked feature branch (or clear the pin) so graph queries resolve that branch instead of the default.
 argument-hint: [branch-name | clear]
 allowed-tools: mcp__plugin_symvanta_symvanta__ref, mcp__plugin_symvanta_symvanta__freshness
 ---
