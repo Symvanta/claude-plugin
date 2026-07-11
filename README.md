@@ -84,39 +84,59 @@ downloaded but not active.
 
 ## What runs on your machine
 
-The plugin executes two small, readable Node hook scripts locally:
+The plugin executes small, readable Node hook scripts locally:
 
 - [`session-start.js`](hooks/session-start.js): prints standing context once at
   the start of a session. Sends nothing anywhere.
-- [`grep-augment.js`](hooks/grep-augment.js): **on by default**, runs **only**
-  on `Grep`/`Glob`. It asks the Symvanta graph which indexed symbol
-  **definitions** match your search term (scoped to the repo you are searching,
-  derived from the search path's git remote) and adds them to the agent's
-  context, so the agent learns to reach for the graph tools. Up to two distinct
-  identifiers from the pattern are looked up in parallel, and results are cached
-  for 60s so repeated searches are instant. It can only **add** context, never
-  block: every error, timeout, or missing token is a clean pass-through, and the
-  Grep itself always runs untouched. To run the lookup it sends only the
-  **search term** (not your file contents) to the Symvanta MCP server.
+- The **augment hook family** (on by default): five hooks sharing one core
+  ([`lib.js`](hooks/lib.js)). Each can only **add** context, never block:
+  every error, timeout, or missing token is a clean pass-through, and the
+  intercepted tool always runs untouched.
+  - [`grep-augment.js`](hooks/grep-augment.js): on `Grep`/`Glob`, looks up
+    matching indexed symbol **definitions** (scoped to the repo you are
+    searching, up to two identifiers from the pattern in parallel, 60s cache)
+    and adds them alongside the raw search results.
+  - [`edit-augment.js`](hooks/edit-augment.js): on `Edit`/`Write` of a code
+    file, injects the edited symbol's **blast radius** (upstream symbol count,
+    files, layers, cross-repo edges, risk tier) before the change lands; a
+    Write over an existing file lists the definitions the overwrite replaces.
+    New files and non-code files stay silent.
+  - [`read-augment.js`](hooks/read-augment.js): on the **first** `Read` of a
+    code file per session, injects the file's symbol skeleton (names, kinds,
+    line bounds) plus any architecture decision records anchored to it.
+    Repeat reads exit instantly.
+  - [`grep-rescue.js`](hooks/grep-rescue.js): after a `Grep` that found
+    **nothing**, suggests graph candidates (auto text/semantic search) so a
+    dead end becomes a lead; a grep with results exits right after the stdin
+    parse, no reads, no network.
+  - [`prompt-augment.js`](hooks/prompt-augment.js): identifier-shaped tokens
+    in your message (backticked spans, snake_case, camelCase) resolve to
+    indexed definitions at turn start. Plain prose never qualifies, so
+    conversational prompts stay silent.
 
-### What the augmenter reads and writes, exactly
+### What the augmenters read, send, and write, exactly
 
-To call the graph it needs your Symvanta MCP token. It reuses the one Claude
+To call the graph they need your Symvanta MCP token. They reuse the one Claude
 Code already stored when you connected, so there is no setup. The read is
-deliberately narrow and the script is short enough to audit in a minute:
+deliberately narrow and each script is short enough to audit in minutes:
 
-- It reads **only** `mcpOAuth[<the Symvanta entry>].accessToken` from
-  `~/.claude/.credentials.json`. It never reads your Anthropic token
-  (`claudeAiOauth`) or any non-Symvanta server's token.
-- That token is sent **only** to the Symvanta MCP server, the same place it was
-  issued for.
-- It writes two local files under `~/.symvanta/`, never uploaded anywhere:
-  `grep-cache.json` (the 60s result cache) and `grep-augment.log` (one JSONL
-  line per run: term, repo, match count, latency, cache hit). The log records
-  your search terms locally so you can see how often the augmenter helps; delete
-  the file anytime, or set `SYMVANTA_GREP_AUGMENT=off` to stop all of it.
+- They read **only** `mcpOAuth[<the Symvanta entry>].accessToken` from
+  `~/.claude/.credentials.json`. Never your Anthropic token (`claudeAiOauth`)
+  or any non-Symvanta server's token.
+- That token is sent **only** to the Symvanta MCP server, the same place it
+  was issued for.
+- What leaves the machine per lookup: extracted identifier **terms**, matched
+  **symbol names**, and repo-relative **file paths**. Never file contents, and
+  never your message text (the prompt hook sends at most two identifier
+  tokens, not the prompt).
+- They write local files under `~/.symvanta/`, never uploaded anywhere:
+  `grep-cache/` (the 60s result cache, one small file per key),
+  `repo-cache.json` (path-to-repo memo), `read-seen/` (per-session first-read
+  markers), and `grep-augment.log` (one JSONL line per run: hook, terms, repo,
+  match count, latency, cache hit). The log exists so `/symvanta:status` can
+  show what the hooks are doing; delete any of these files anytime.
 
-If you would rather it not read the credentials file, you have two switches:
+Switches (restart Claude Code after changing):
 
 ```
 # Supply your own token instead (dashboard -> Settings -> MCP connection ->
@@ -124,17 +144,22 @@ If you would rather it not read the credentials file, you have two switches:
 # never read:
 export SYMVANTA_MCP_TOKEN="<token>"
 
-# Or turn the augmenter off entirely (no read, no network on tool calls):
-export SYMVANTA_GREP_AUGMENT=off
+# Turn the whole family off (no reads, no network on any tool call):
+export SYMVANTA_AUGMENT=off        # the legacy SYMVANTA_GREP_AUGMENT=off also works
+
+# Or turn off individual hooks:
+export SYMVANTA_EDIT_AUGMENT=off   # Edit/Write blast radius
+export SYMVANTA_READ_AUGMENT=off   # first-read skeleton + ADRs
+export SYMVANTA_GREP_RESCUE=off    # empty-grep suggestions
+export SYMVANTA_PROMPT_AUGMENT=off # prompt term lookup
 ```
 
-You can also delete the `PreToolUse` block from
-[`hooks/hooks.json`](hooks/hooks.json) to remove it. Restart Claude Code after
-any of these.
+You can also delete any hook's block from
+[`hooks/hooks.json`](hooks/hooks.json) to remove it entirely.
 
-`Bash`, `Edit`, and every other tool run untouched. All code navigation happens
-through the Symvanta MCP server over HTTPS, gated by OAuth. No telemetry, no
-background processes.
+`Bash` and every tool without a hook above run untouched. All code navigation
+happens through the Symvanta MCP server over HTTPS, gated by OAuth. No
+telemetry, no background processes.
 
 ### How the Grep/Glob augmenter works
 
@@ -179,9 +204,15 @@ flowchart TD
 
 ```
 .claude-plugin/plugin.json   manifest + MCP server registration
-hooks/hooks.json             SessionStart + PreToolUse(Grep|Glob) wiring
+hooks/hooks.json             SessionStart + augment family wiring (PreToolUse, PostToolUse, UserPromptSubmit)
 hooks/session-start.js       standing-context injector
-hooks/grep-augment.js        non-blocking Grep/Glob augmenter
+hooks/lib.js                 shared augment core (auth, transport, cache, log)
+hooks/grep-augment.js        Grep/Glob definition augmenter
+hooks/edit-augment.js        Edit/Write blast-radius augmenter
+hooks/read-augment.js        first-read file skeleton + ADR augmenter
+hooks/grep-rescue.js         empty-grep graph suggestions (PostToolUse)
+hooks/prompt-augment.js      prompt identifier lookup (UserPromptSubmit)
+hooks/augment-stats.js       local activity summary for /symvanta:status
 commands/                    slash commands (ask, blast, trace, route, status, architecture, scope, branch, working-tree, tests, recent)
 skills/symvanta/SKILL.md     tool decision matrix and conventions
 scripts/                     sync-skill.mjs (SKILL from source) + check-tool-prefixes.mjs (CI guard)

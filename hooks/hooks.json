@@ -1,5 +1,5 @@
 {
-  "description": "Symvanta hooks. SessionStart injects standing context once so the agent reaches for the graph tools. PreToolUse on Grep/Glob is a non-blocking augmenter (on by default): it asks the Symvanta graph which indexed symbols match the search term and adds them as context, while the search itself runs untouched. Auth reuses the Symvanta MCP token Claude Code already stored (it reads ONLY that entry's access token from the credentials file, never your Anthropic token; set SYMVANTA_MCP_TOKEN to supply your own instead, or SYMVANTA_GREP_AUGMENT=off to disable). It can only ADD context, never block, delay-to-failure, or interrupt a tool: every error or timeout is a clean pass-through. Only the search term (not file contents) is sent to the MCP server. No hook runs on Bash, Edit, or any other tool.",
+  "description": "Symvanta hooks. SessionStart injects standing context once. A family of non-blocking augmenters (on by default) adds graph context around tool use: PreToolUse on Grep/Glob injects matching symbol definitions; PreToolUse on Edit/Write injects the edited symbol's blast radius; PreToolUse on Read injects a first-read-per-session file skeleton plus decision records; PostToolUse on Grep suggests graph candidates only when the search came back empty; UserPromptSubmit looks up identifier-shaped terms from the message (never the message text). Auth reuses the stored Symvanta MCP token only, never your Anthropic token; SYMVANTA_MCP_TOKEN supplies your own instead. Hooks can only ADD context, never block, delay-to-failure, or interrupt a tool: every error or timeout is a clean pass-through. Only extracted identifier terms, matched symbol names, and repo-relative paths are sent, never file contents or prompt text. Controls: SYMVANTA_AUGMENT=off (or legacy SYMVANTA_GREP_AUGMENT=off) disables the whole family; per hook: SYMVANTA_EDIT_AUGMENT / SYMVANTA_READ_AUGMENT / SYMVANTA_GREP_RESCUE / SYMVANTA_PROMPT_AUGMENT=off.",
   "hooks": {
     "SessionStart": [
       {
@@ -20,6 +20,53 @@
             "type": "command",
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/grep-augment.js"],
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/edit-augment.js"],
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/read-augment.js"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/grep-rescue.js"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/prompt-augment.js"],
             "timeout": 5
           }
         ]

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.2.0
+
+- The Grep/Glob augmenter grows into a family of non-blocking augment hooks,
+  all on by default with the same additive contract: they can only ADD
+  context, never block a tool, and every error or timeout is a clean
+  pass-through.
+  - **Edit/Write** (PreToolUse): before an edit lands, injects the edited
+    symbol's blast radius (upstream symbol count, files, layers, cross-repo
+    edges, risk tier) via `list_file_symbols` + `relate` kind:blast_radius.
+    A Write over an existing file lists the definitions the overwrite
+    replaces. New files and non-code files stay silent.
+  - **Read** (PreToolUse): the first Read of a code file per session injects
+    the file's symbol skeleton (names, kinds, line bounds) plus any
+    architecture decision records anchored to it. Repeat reads exit
+    instantly via a local seen-marker.
+  - **Grep rescue** (PostToolUse): only when a grep comes back EMPTY,
+    suggests graph candidates via `locate` (auto text/semantic), turning a
+    dead-end search into leads instead of a synonym-retry loop. A grep with
+    results exits after the stdin parse.
+  - **Prompt terms** (UserPromptSubmit): identifier-shaped tokens in the
+    user's message (backticked spans, snake_case, camelCase) resolve to
+    indexed definitions injected at turn start. Plain prose never qualifies,
+    so conversational prompts stay silent, and only the extracted tokens are
+    sent, never the message text.
+- Shared hook core (`hooks/lib.js`): one implementation of the narrow token
+  read, MCP transport, per-key atomic cache, and local JSONL log for the whole
+  family. Repo derivation is now memoized on disk, saving one or two git
+  subprocess spawns per intercepted tool call.
+- Controls: `SYMVANTA_AUGMENT=off` disables the whole family (the legacy
+  `SYMVANTA_GREP_AUGMENT=off` still does too); per-hook switches
+  `SYMVANTA_EDIT_AUGMENT` / `SYMVANTA_READ_AUGMENT` / `SYMVANTA_GREP_RESCUE` /
+  `SYMVANTA_PROMPT_AUGMENT` = `off`. `SYMVANTA_HOOK_TIMEOUT_MS` caps every
+  hook's lookup budget.
+- `augment-stats.js` (surfaced by `/symvanta:status`) now reports per-hook
+  runs, match rate, cache rate, and latency percentiles from the same local
+  log; pre-family log lines count under grep.
+
 ## 1.1.0
 
 - MCP server URL is now configurable via the `mcpUrl` plugin option (defaults to
