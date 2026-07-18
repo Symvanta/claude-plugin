@@ -269,6 +269,14 @@ what local git can't.
   tier for the edge: `high` = compiler-grade (SCIP), `medium` = framework /
   heuristic, `low` = string-heuristic, `correlational` = git co-change. Treat `low` /
   `correlational` as leads to verify; absent means the row predates tiering.
+- A cross-repo `relate` row may also carry `package`: the SCIP package name that
+  joined the edge across repositories. `find_node` returns `scip_package_name` /
+  `scip_package_version` / `scip_manager` on definitions indexed with package
+  identity.
+- `index_health` also reports `versionDrift` (a dependency pinned at one version
+  while the sibling repo that provides it is at another) and per-repo
+  `externalsCoverage` (external references joined to sibling definitions vs
+  stubbed).
 - Repository IDs come in two shapes, both opaque: base62 strings (`apcwr9` from
   `init`, `find_node`, `freshness`) and numeric IDs (`564` from `estimate_scope`,
   `locate` mode:codebase). Pass base62 back when a tool asks for `repositoryId`.
