@@ -38,10 +38,14 @@ from (skips the explicit `repository` arg); omit both prefix and `repository` an
 - Call `init` at session start. `repositoryCount > 0` means you're connected to a
   populated project; proceed.
 - A tenant may hold several indexed projects (`init`'s `otherProjects`). Without
-  `projectId` / `repository`, tools fan out across ALL of them: the response has a
+  `projectId` / `repository`, tools fan out across them: the response has a
   top-level `matchedProject` when every result resolved in one project, per-row when
   they span projects, plus per-row `alsoInProjects` for a symbol in more than one.
-  Pass `repository` or `projectId` to scope to one; a repo outside the active
+  For `locate`, that fan-out is budget-asymmetric: an unscoped query runs the active
+  (default) project first at full budget and searches the other projects with a small
+  bounded budget (reduced limit, short per-project timeout), so a non-default project
+  can return partial `locate` results. Pass `repository` or `projectId` to scope to
+  one and get full coverage of a non-default project; a repo outside the active
   project is not unindexed.
 - If `repositoryCount === 0`, tell the user "no repositories are attached to your
   active Symvanta project" and ask them to attach one in the dashboard. Do not
