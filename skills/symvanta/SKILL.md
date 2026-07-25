@@ -228,6 +228,9 @@ need to act.
   that repository (only a bounded window is retained). The error lists the
   revisions that exist: pin one of those, or drop `commitSha` for the latest.
   Graph reads never substitute a different revision for the one you named.
+- `revision_not_servable`: the revision exists but its graph was superseded: a
+  later reindex moved those symbols onto a newer revision. Drop `commitSha`;
+  discard any module / architecture numbers you already read at that sha.
 - `file_not_found`: file absent at the indexed SHA. `freshness` to check; re-check
   the path in a local clone (may be added / renamed on a newer commit).
 - `repository_not_attached`: the repo name isn't in the active project scope. Check
