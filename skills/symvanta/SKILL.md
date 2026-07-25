@@ -224,6 +224,10 @@ need to act.
   `Read` / `Grep`; note that cross-repo signals (callers, library catalog) are missing.
 - `stale_index`: indexed SHA behind live HEAD. Proceed against latest indexed and
   note it; for exact reproducibility pass the suggested `commitSha`.
+- `revision_not_indexed`: the `commitSha` you pinned is not an indexed revision of
+  that repository (only a bounded window is retained). The error lists the
+  revisions that exist: pin one of those, or drop `commitSha` for the latest.
+  Graph reads never substitute a different revision for the one you named.
 - `file_not_found`: file absent at the indexed SHA. `freshness` to check; re-check
   the path in a local clone (may be added / renamed on a newer commit).
 - `repository_not_attached`: the repo name isn't in the active project scope. Check
@@ -242,7 +246,9 @@ clone), compare `git rev-parse HEAD` against `freshness` -> `lastIndexedSha`.
 - **Local AHEAD** (index stale): for exact reproducibility (PR review, repro) pass
   `commitSha: <indexedSha>`; else proceed and note the staleness.
 - **Local BEHIND** (you checked out an older commit): pass `commitSha: <localHead>`
-  so queries match what you'd `Read`.
+  so queries match what you'd `Read`. Only revisions still in the retention
+  window resolve; an older one returns `revision_not_indexed` rather than
+  quietly answering from a different revision.
 
 If `edgeCount === 0` (from `list_repositories` / `init`), the repo has no graph
 edges: `relate` silently returns empty (no error). Fall back to `locate` (mode:text)
