@@ -231,6 +231,9 @@ need to act.
 - `revision_not_servable`: the revision exists but its graph was superseded: a
   later reindex moved those symbols onto a newer revision. Drop `commitSha`;
   discard any module / architecture numbers you already read at that sha.
+  Exception: a revision flagged `architectureSnapshot: true` in the revisions
+  list is a kept published pin; `map` (view:"architecture") still serves its
+  module map as a snapshot, other graph tools refuse it.
 - `file_not_found`: file absent at the indexed SHA. `freshness` to check; re-check
   the path in a local clone (may be added / renamed on a newer commit).
 - `repository_not_attached`: the repo name isn't in the active project scope. Check
