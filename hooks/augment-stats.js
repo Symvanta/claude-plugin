@@ -78,6 +78,12 @@ function main() {
         if (degraded['timeout']) {
             out.push('             timeout means a lookup exceeded its budget; raise SYMVANTA_HOOK_TIMEOUT_MS if frequent.');
         }
+        if (degraded['no-token:no-creds-file:keychain-empty']) {
+            out.push('             keychain-empty (macOS) means the login Keychain has no Claude Code credentials yet; reconnect the MCP server once to populate it.');
+        }
+        if (degraded['no-token:no-creds-file:keychain-unreadable']) {
+            out.push('             keychain-unreadable (macOS) means the Keychain entry exists but did not parse; run `security find-generic-password -s "Claude Code-credentials" -w` to inspect it.');
+        }
     }
     process.stdout.write(out.join('\n') + '\n');
 }

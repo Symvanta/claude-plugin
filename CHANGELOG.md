@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.7
+
+- Fix: on macOS, Claude Code stores its OAuth credentials in the login
+  Keychain (service `Claude Code-credentials`), not in
+  `~/.claude/.credentials.json`. `loadAuth()` in `hooks/lib.js` only read the
+  JSON file, so every augment hook (grep, edit, read, rescue, prompt) silently
+  degraded to pass-through (`no-creds-file`) on every macOS install, even with
+  a live, working MCP connection. Added a Keychain fallback read via the
+  `security` CLI when the JSON file is absent, used only on `darwin`, memoized
+  to disk for 5 minutes (`~/.symvanta/keychain-cache.json`) so a busy session
+  does not shell out on every hook call.
+- The Keychain fallback's failure modes are now distinguishable in the log
+  and in `/symvanta:status` / `augment-stats.js`: `no-creds-file:keychain-empty`
+  (nothing in the Keychain yet, reconnect the MCP server) versus
+  `no-creds-file:keychain-unreadable` (an entry exists but did not parse),
+  instead of both collapsing into the same generic `no-creds-file`.
+
 ## 1.2.0
 
 - The Grep/Glob augmenter grows into a family of non-blocking augment hooks,

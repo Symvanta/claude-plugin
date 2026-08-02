@@ -231,6 +231,45 @@ function pruneDir(dir, ttlMs) {
     } catch { /* ignore */ }
 }
 
+// On macOS, Claude Code stores its OAuth credentials (the same mcpOAuth blob
+// the JSON file carries on Windows/Linux) in the login Keychain under service
+// "Claude Code-credentials", not in ~/.claude/.credentials.json. Memoized on
+// disk (short TTL) so a busy session doesn't spawn `security` on every hook
+// call; loadAuth() still re-checks token expiry against Date.now() on every
+// read, so a stale-but-cached blob never lets an actually-expired token
+// through. Returns { creds } on a parseable hit, or { error } distinguishing
+// "nothing there" (keychain-empty: no security CLI, or no matching item) from
+// "found but unusable" (keychain-unreadable: bad JSON), so the two failure
+// modes stay diagnosable in the log instead of both collapsing to
+// no-creds-file.
+const KEYCHAIN_MEMO_FILE = path.join(STATE_DIR, 'keychain-cache.json');
+const KEYCHAIN_MEMO_TTL_MS = 5 * 60 * 1000;
+function readMacKeychainCreds() {
+    if (process.platform !== 'darwin') return { error: 'no-creds-file' };
+    try {
+        const memo = JSON.parse(fs.readFileSync(KEYCHAIN_MEMO_FILE, 'utf8'));
+        if (memo && Date.now() - memo.t < KEYCHAIN_MEMO_TTL_MS) return memo.v;
+    } catch { /* no memo yet */ }
+    let result;
+    try {
+        const out = cp.execFileSync('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { encoding: 'utf8', timeout: 3000 });
+        try {
+            result = { creds: JSON.parse(out) };
+        } catch {
+            result = { error: 'no-creds-file:keychain-unreadable' };
+        }
+    } catch {
+        result = { error: 'no-creds-file:keychain-empty' };
+    }
+    try {
+        fs.mkdirSync(STATE_DIR, { recursive: true });
+        const tmp = `${KEYCHAIN_MEMO_FILE}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify({ t: Date.now(), v: result }));
+        fs.renameSync(tmp, KEYCHAIN_MEMO_FILE);
+    } catch { /* memo is best-effort */ }
+    return result;
+}
+
 // Returns { token, endpoint } on success, or { error } naming why no token was
 // usable, so an EXPIRED token (silent degradation to pass-through) stays
 // distinguishable from a never-connected one in the log.
@@ -243,7 +282,9 @@ function loadAuth() {
     try {
         creds = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.claude', '.credentials.json'), 'utf8'));
     } catch {
-        return { error: 'no-creds-file' };
+        const kc = readMacKeychainCreds();
+        if (!kc.creds) return { error: kc.error };
+        creds = kc.creds;
     }
     const mcp = creds && creds.mcpOAuth;
     if (!mcp || typeof mcp !== 'object') return { error: 'no-mcp-entries' };

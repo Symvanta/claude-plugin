@@ -121,8 +121,10 @@ Code already stored when you connected, so there is no setup. The read is
 deliberately narrow and each script is short enough to audit in minutes:
 
 - They read **only** `mcpOAuth[<the Symvanta entry>].accessToken` from
-  `~/.claude/.credentials.json`. Never your Anthropic token (`claudeAiOauth`)
-  or any non-Symvanta server's token.
+  `~/.claude/.credentials.json` (on macOS, Claude Code stores this in the
+  login Keychain instead, under service `Claude Code-credentials`, so the
+  hooks read that when the file is absent). Never your Anthropic token
+  (`claudeAiOauth`) or any non-Symvanta server's token.
 - That token is sent **only** to the Symvanta MCP server, the same place it
   was issued for.
 - What leaves the machine per lookup: extracted identifier **terms**, matched
@@ -131,7 +133,9 @@ deliberately narrow and each script is short enough to audit in minutes:
   tokens, not the prompt).
 - They write local files under `~/.symvanta/`, never uploaded anywhere:
   `grep-cache/` (the 60s result cache, one small file per key),
-  `repo-cache.json` (path-to-repo memo), `read-seen/` (per-session first-read
+  `repo-cache.json` (path-to-repo memo), `keychain-cache.json` (macOS only: a
+  5-minute memo of the Keychain read, so a busy session doesn't shell out to
+  `security` on every tool call), `read-seen/` (per-session first-read
   markers), and `grep-augment.log` (one JSONL line per run: hook, terms, repo,
   match count, latency, cache hit). The log exists so `/symvanta:status` can
   show what the hooks are doing; delete any of these files anytime.
@@ -176,7 +180,7 @@ flowchart TD
     D -->|no, default| TX[Extract up to 2 identifiers from the pattern; derive the repo from the search path]
     TX --> CACHE{Fresh 60s cache hit?}
     CACHE -->|yes| F[Format matching definitions as additionalContext]
-    CACHE -->|no| TOK[Token: SYMVANTA_MCP_TOKEN, else the stored Symvanta token from ~/.claude/.credentials.json]
+    CACHE -->|no| TOK[Token: SYMVANTA_MCP_TOKEN, else the stored Symvanta token from ~/.claude/.credentials.json (macOS: login Keychain)]
     TOK --> C[quick_lookup per term, in parallel, repo-scoped, hard cap 1.5s; falls back to locate mode:symbol]
 
     subgraph cloud["Symvanta cloud (only the search TERMs leave your machine)"]
