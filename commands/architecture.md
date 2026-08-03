@@ -1,5 +1,5 @@
 ---
-description: Show the codebase's high-level architecture: Louvain functional modules with their PageRank hubs, cross-module coupling, and the repo-wide load-bearing functions.
+description: "Show the codebase's high-level architecture: Louvain functional modules with their PageRank hubs, cross-module coupling, and the repo-wide load-bearing functions."
 argument-hint: [repository (optional)]
 allowed-tools: mcp__plugin_symvanta_symvanta__map, mcp__plugin_symvanta_symvanta__index_health, mcp__plugin_symvanta_symvanta__init, mcp__plugin_symvanta_symvanta__find_node
 ---

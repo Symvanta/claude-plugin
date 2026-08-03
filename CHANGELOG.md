@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.8
+
+- The SessionStart primer (`hooks/session-start.js`) previously named only 7
+  of the ~30 available tools inline, and relied on the agent separately
+  calling `init` (whose response happens to carry the full decision matrix)
+  or loading the `symvanta` skill to learn the rest exist. Neither is
+  guaranteed, so a session could run entirely on the 7 named tools. The
+  primer now inlines a one-line-each enumeration of all 19 agent-facing
+  tools (everything except `quick_lookup`, which is hook-internal) directly
+  into `additionalContext`, since that field is guaranteed to land in every
+  session's context, unlike a skill load or an `init` call. Deeper routing
+  rules, anti-patterns, and edge cases stay in the `symvanta` skill, which
+  the primer still points the agent to first (a local, no-network operation,
+  so it works even when `init`/the MCP connection is degraded). Adds
+  ~630 tokens to every session's context.
+- Fix: `commands/architecture.md`'s frontmatter `description` had an
+  unquoted mid-sentence colon, which is invalid YAML for a plain scalar.
+  The command silently loaded with empty frontmatter at runtime (no
+  description, no argument hint, and no `allowed-tools` restriction).
+  Quoted the description; `claude plugin validate` now passes clean.
+
 ## 1.2.7
 
 - Fix: on macOS, Claude Code stores its OAuth credentials in the login
