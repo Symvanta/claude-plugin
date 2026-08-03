@@ -62,9 +62,35 @@ function done(hook, outcome, rec) {
     process.exit(0);
 }
 
+// Set by callTool when the MCP server's response carries a stale-version
+// notice (see VERSION_NOTICE_HEADER below). Surfaced through whichever hook
+// next calls emitContext, at most once per VERSION_NOTICE_TTL_MS so it does
+// not repeat on every hook call in a session.
+let pendingVersionNotice = null;
+const VERSION_NOTICE_MARKER = path.join(STATE_DIR, 'version-notice-shown');
+const VERSION_NOTICE_TTL_MS = 24 * 60 * 60 * 1000;
+function versionNoticeAlreadyShown() {
+    try {
+        return Date.now() - fs.statSync(VERSION_NOTICE_MARKER).mtimeMs < VERSION_NOTICE_TTL_MS;
+    } catch {
+        return false;
+    }
+}
+function markVersionNoticeShown() {
+    try {
+        fs.mkdirSync(STATE_DIR, { recursive: true });
+        fs.writeFileSync(VERSION_NOTICE_MARKER, String(Date.now()));
+    } catch { /* best-effort */ }
+}
+
 function emitContext(hook, eventName, text, rec) {
     logStats(hook, { outcome: 'injected', ...rec });
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: eventName, additionalContext: text } }));
+    let out = text;
+    if (pendingVersionNotice && !versionNoticeAlreadyShown()) {
+        out += `\n[symvanta] ${pendingVersionNotice}`;
+        markVersionNoticeShown();
+    }
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: eventName, additionalContext: out } }));
     process.exit(0);
 }
 
@@ -322,20 +348,43 @@ function parseMcpBody(text) {
     }
 }
 
+// Installed plugin version, read from the manifest one directory up from
+// hooks/ and sent on every tools/call so the server can flag a stale install.
+// Memoized per process; each hook is a fresh short-lived process, so this is
+// at most one extra small file read per hook invocation.
+let _pluginVersion;
+function pluginVersion() {
+    if (_pluginVersion !== undefined) return _pluginVersion;
+    try {
+        const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '.claude-plugin', 'plugin.json'), 'utf8'));
+        _pluginVersion = typeof pkg.version === 'string' ? pkg.version : null;
+    } catch {
+        _pluginVersion = null;
+    }
+    return _pluginVersion;
+}
+
 // One tools/call: returns result.structuredContent (whole object, since tools
 // answer with different top-level keys: matches, symbols, results, decisions),
 // or null on a transport / tool error so the caller can fall back or stay silent.
 async function callTool(auth, name, args, signal) {
+    const version = pluginVersion();
     const res = await fetch(auth.endpoint, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${auth.token}`,
             'Content-Type': 'application/json',
             Accept: 'application/json, text/event-stream',
+            ...(version ? { 'X-Symvanta-Plugin-Version': version } : {}),
         },
         signal,
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
     });
+    // The server echoes this back (see VERSION_NOTICE_HEADER server-side) only
+    // when the version header above names an install older than the latest
+    // release; emitContext appends it at most once a day.
+    const notice = res.headers.get('x-symvanta-plugin-notice');
+    if (notice) pendingVersionNotice = notice;
     if (!res.ok) return null;
     const body = parseMcpBody(await res.text());
     if (!body || body.error || !body.result || body.result.isError) return null;

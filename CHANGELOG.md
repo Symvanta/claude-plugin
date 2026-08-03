@@ -2,6 +2,11 @@
 
 ## 1.2.8
 
+- Every hook call now sends the installed plugin version as
+  `X-Symvanta-Plugin-Version`. When the MCP server sees an install older than
+  the latest release, it echoes an `X-Symvanta-Plugin-Notice` response header;
+  the next hook that emits context appends it (`/plugin update
+  symvanta@symvanta` then restart), at most once a day per machine.
 - The SessionStart primer (`hooks/session-start.js`) previously named only 7
   of the ~30 available tools inline, and relied on the agent separately
   calling `init` (whose response happens to carry the full decision matrix)
