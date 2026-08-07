@@ -37,6 +37,10 @@ remember tool names:
   (`list_tests_for`).
 - `/symvanta:recent [path]`: recently changed files and recent commits
   (`history`).
+- `/symvanta:setup [local]`: write the Symvanta routing block into the
+  project's `CLAUDE.md` (or `CLAUDE.local.md` with `local`). Re-running
+  replaces the marked block in place. Subagents read CLAUDE.md, so the
+  routing reaches them too.
 
 ## Install
 

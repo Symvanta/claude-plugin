@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0
+
+- New `/symvanta:setup [local]` command. Writes the Symvanta routing block
+  into the project's `CLAUDE.md`, or `CLAUDE.local.md` when called with
+  `local`. The block points sessions at `locate` / `find_node` / `relate` /
+  `ask_codebase` first, with Grep as the fallback on empty results. Subagents
+  read CLAUDE.md but skip the SessionStart primer and the skill, so this is
+  the only plugin surface that reaches them. The block sits between
+  `symvanta:routing` markers; re-running the command replaces the marked
+  section and leaves the rest of the file alone.
+
 ## 1.2.8
 
 - Every hook call now sends the installed plugin version as
