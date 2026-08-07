@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.1
+
+- The SessionStart primer now points at `/symvanta:setup` once per project per
+  machine, and only while the routing block is absent. Presence is checked
+  against the `symvanta:routing:begin` marker in the project's `CLAUDE.md` and
+  `CLAUDE.local.md` (so a hand-pasted block also counts); a shown nudge is
+  remembered in `~/.symvanta/setup-nudge/`. Once the block exists, or after the
+  one nudge, sessions say nothing. All failure paths (no stdin, unreadable
+  files, read-only home dir) fall back to the normal primer.
+
 ## 1.3.0
 
 - New `/symvanta:setup [local]` command. Writes the Symvanta routing block
