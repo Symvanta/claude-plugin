@@ -25,6 +25,7 @@
 const lib = require('./lib');
 
 const HOOK = 'grep';
+lib.setCallOrigin(HOOK);
 const BUDGET_MS = lib.budget(1500);
 
 async function main() {

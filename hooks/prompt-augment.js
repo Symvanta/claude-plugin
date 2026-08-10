@@ -15,6 +15,7 @@
 const lib = require('./lib');
 
 const HOOK = 'prompt';
+lib.setCallOrigin(HOOK);
 const EVENT = 'UserPromptSubmit';
 const BUDGET_MS = lib.budget(1200);
 

@@ -17,6 +17,7 @@ const crypto = require('node:crypto');
 const lib = require('./lib');
 
 const HOOK = 'read';
+lib.setCallOrigin(HOOK);
 const EVENT = 'PreToolUse';
 const BUDGET_MS = lib.budget(1500);
 const SEEN_DIR = path.join(lib.STATE_DIR, 'read-seen');

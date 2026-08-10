@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.0
+
+- New `bash-augment` hook (PreToolUse on Bash): when a Bash command is a code
+  search (`rg`, `git grep`, or a recursive / path-scoped `grep`), the matching
+  indexed definitions are injected alongside, same as the Grep-tool hook.
+  Pipeline filters (`docker ps | grep worker`) and every other Bash command
+  pass through untouched on a silent fast path. Shares the Grep hook's result
+  cache. Disable with `SYMVANTA_BASH_AUGMENT=off` (family switches apply).
+- Every hook call now sends `X-Symvanta-Origin: hook/<name>`, so server-side
+  usage analytics can separate hook-driven assist traffic from lookups the
+  agent initiated itself. The dashboard's MCP Usage page shows the split.
+- The SessionStart primer's tool enumeration now ships as
+  `hooks/tool-list.json`, generated from the same canonical ruleset source as
+  the skill and the dashboard copy, so the three can no longer drift. The
+  `/symvanta:setup` routing block is generated from that source too (now v2:
+  it names shell grep/rg as code search that routes through `locate`).
+
 ## 1.3.1
 
 - The SessionStart primer now points at `/symvanta:setup` once per project per

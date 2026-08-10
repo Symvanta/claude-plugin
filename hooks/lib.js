@@ -348,6 +348,15 @@ function parseMcpBody(text) {
     }
 }
 
+// Which hook this process is, sent as X-Symvanta-Origin ("hook/<name>") on
+// every tools/call so server-side usage analytics can separate hook-driven
+// assist traffic from agent-initiated lookups. Set once per process by each
+// hook right after it loads this module.
+let _callOrigin = null;
+function setCallOrigin(hookName) {
+    _callOrigin = hookName ? `hook/${hookName}` : null;
+}
+
 // Installed plugin version, read from the manifest one directory up from
 // hooks/ and sent on every tools/call so the server can flag a stale install.
 // Memoized per process; each hook is a fresh short-lived process, so this is
@@ -376,6 +385,7 @@ async function callTool(auth, name, args, signal) {
             'Content-Type': 'application/json',
             Accept: 'application/json, text/event-stream',
             ...(version ? { 'X-Symvanta-Plugin-Version': version } : {}),
+            ...(_callOrigin ? { 'X-Symvanta-Origin': _callOrigin } : {}),
         },
         signal,
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
@@ -493,6 +503,7 @@ module.exports = {
     cacheSet,
     pruneDir,
     loadAuth,
+    setCallOrigin,
     callTool,
     callMatches,
     lookupDefinitions,

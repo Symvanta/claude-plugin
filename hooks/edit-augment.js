@@ -20,6 +20,7 @@ const fs = require('node:fs');
 const lib = require('./lib');
 
 const HOOK = 'edit';
+lib.setCallOrigin(HOOK);
 const EVENT = 'PreToolUse';
 const BUDGET_MS = lib.budget(2500);
 const KIND_WEIGHT = { class: 4, interface: 3, function: 3, method: 3 };

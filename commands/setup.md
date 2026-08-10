@@ -25,13 +25,14 @@ Steps:
    including the markers:
 
    ```
-   <!-- symvanta:routing:begin v1 -->
+   <!-- symvanta:routing:begin v2 -->
    This repository is indexed by Symvanta. To find or understand code, use the
    Symvanta MCP tools before local search: `locate` (search by text, symbol,
    file, or meaning), `find_node` (known symbol), `relate` (callers, impact,
-   dependencies), `ask_codebase` (how and why questions). Fall back to Grep or
-   file reading only when a Symvanta tool returns empty. This applies to
-   subagents too.
+   dependencies), `ask_codebase` (how and why questions). Shell search counts:
+   a `grep` or `rg` run through the terminal is still a code search and routes
+   through `locate` (mode:text). Fall back to Grep or file reading only when a
+   Symvanta tool returns empty. This applies to subagents too.
    <!-- symvanta:routing:end -->
    ```
 

@@ -14,6 +14,7 @@
 const lib = require('./lib');
 
 const HOOK = 'rescue';
+lib.setCallOrigin(HOOK);
 const EVENT = 'PostToolUse';
 // Wider budget than the definition hooks: the no-mode locate may route to
 // semantic search (embedding round trip), and it only ever runs on a grep
