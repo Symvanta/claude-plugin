@@ -294,7 +294,9 @@ what local git can't.
   `externalsCoverage` (external references joined to sibling definitions vs
   stubbed), and `unindexableRepositories` (repos whose last index produced no
   graph: `no_default_branch` = the remote has no resolvable default branch like
-  an empty repo, `awaiting_upload` = an upload repo with no zip yet), which
+  an empty repo, `awaiting_upload` = an upload repo with no zip yet,
+  `scip_runner_failed` = the precise indexer failed, so the index was withheld
+  rather than published degraded and the job is retrying), which
   explains a repo that silently indexed nothing.
 - Repository IDs come in two shapes, both opaque: base62 strings (`apcwr9` from
   `init`, `find_node`, `freshness`) and numeric IDs (`564` from `estimate_scope`,
