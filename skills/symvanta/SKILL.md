@@ -302,6 +302,13 @@ what local git can't.
   `scip_source_read_failed` = the checkout could not supply the files the
   .scip referenced, so the ingest aborted and the job is retrying), which
   explains a repo that silently indexed nothing.
+- `index_health` also reports `degradedRepositories`: repos that DID index but
+  lost something derived from the graph. `community_detection_skipped` = Louvain
+  clustering did not run (the clustering edge count passed
+  COMMUNITY_EDGE_CEILING, or COMMUNITY_DETECTION was off), so the revision holds
+  zero community nodes and `map view:"architecture"` has no modules. The graph
+  itself is complete and nothing is withheld; `map view:"architecture"` says the
+  same thing in place of an empty map.
 - Repository IDs come in two shapes, both opaque: base62 strings (`apcwr9` from
   `init`, `find_node`, `freshness`) and numeric IDs (`564` from `estimate_scope`,
   `locate` mode:codebase). Pass base62 back when a tool asks for `repositoryId`.
