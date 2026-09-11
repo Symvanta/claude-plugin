@@ -1,4 +1,5 @@
 [
+  "init - call first with repository:\"owner/name\" (the checkout remote): binds the session to the project holding it; workspace.attached=false means this checkout is not indexed",
   "find_node - known symbol by name or path",
   "locate - search by literal text, symbol name/pattern, file name, config key/env var, or semantic meaning when the name is unknown (mode: text|symbol|file|config|semantic|codebase; omit mode to just search)",
   "relate - who calls X (kind:callers), what X depends on (dependencies), blast radius of changing X (blast_radius), type hierarchy (heritage), call chain (chain), what implements an interface (implementers), or the path between two symbols (path)",
@@ -16,6 +17,9 @@
   "library - library package and version info",
   "freshness - index drift vs the remote HEAD for one repository",
   "index_health - per-project index health (edge counts, unindexable repos, architecture stats)",
-  "ref - pin a feature branch for reads, or make uncommitted edits queryable",
-  "bundle - up to 10 independent lookups in one parallel round-trip"
+  "ref - pin a feature branch for reads, make uncommitted edits queryable, or pin the session to a project (op:use_project / clear_project)",
+  "bundle - up to 10 independent lookups in one parallel round-trip",
+  "create_project - create a project to index a new codebase into (mcp:admin)",
+  "add_repository - attach a repository to a project: public as is, private via installation_id from list_installations or a workspace PAT (mcp:admin)",
+  "list_installations - GitHub App installations connected to the workspace and the repositories each can reach"
 ]

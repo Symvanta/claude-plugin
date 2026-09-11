@@ -35,8 +35,25 @@ from (skips the explicit `repository` arg); omit both prefix and `repository` an
 
 ## First call
 
-- Call `init` at session start. `repositoryCount > 0` means you're connected to a
-  populated project; proceed.
+- Call `init` at session start with `repository: "owner/name"`, the checkout's
+  GitHub remote (`git config --get remote.origin.url`; a clone URL is accepted).
+  That binds the session to the project holding the checkout: `init` answers with
+  that project as the active one, `workspace.attached: true`, and pins it so calls
+  without `projectId` resolve there. `repositoryCount > 0` on it means you're
+  connected to a populated project; proceed.
+- `workspace.attached: false` means this checkout is NOT indexed. Nothing in that
+  answer describes it: do not query the graph for the checkout and do not route
+  through the other projects `init` lists (they are other codebases). Follow its
+  `next_steps`: `create_project` when the codebase needs its own project, then
+  `add_repository { owner, repo_name, projectId }`; a private repository needs
+  `installation_id` from `list_installations` (a GitHub App installation that
+  covers it) or a workspace PAT saved on the dashboard. All three need an
+  `mcp:admin` token (a first-party MCP Connection token has it; a read-only token
+  gets `admin_scope_required`, so tell the user). Until it is attached and indexed,
+  work with local tools.
+- Not in a git checkout, or no remote: call `init` without `repository`; the
+  active project is the pinned one (`ref` op:"use_project") or the workspace
+  default, and `project_source` says which.
 - A tenant may hold several indexed projects (`init`'s `otherProjects`). Without
   `projectId` / `repository`, tools fan out across them: the response has a
   top-level `matchedProject` when every result resolved in one project, per-row when
@@ -47,8 +64,9 @@ from (skips the explicit `repository` arg); omit both prefix and `repository` an
   can return partial `locate` results. Pass `repository` or `projectId` to scope to
   one and get full coverage of a non-default project; a repo outside the active
   project is not unindexed.
-- If `repositoryCount === 0`, tell the user "no repositories are attached to your
-  active Symvanta project" and ask them to attach one in the dashboard. Do not
+- If `repositoryCount === 0` and the checkout is not attached anywhere, tell the
+  user "no repositories are attached to your active Symvanta project" and either
+  attach it over MCP (above) or ask them to attach it in the dashboard. Do not
   silently fall back to grep over unrelated files.
 - Routing-critical tools may attach `next_steps: [{ tool, reason }]` on empty /
   partial results: follow it instead of guessing. It enforces graph -> text -> grep,
@@ -135,6 +153,11 @@ Aligned with `init.usage.decision_matrix` (the in-session value is authoritative
 | Library packages / version | `library` |
 | Read a feature / RFC branch | `ref` (op:"use"; "clear" reverts) |
 | Query uncommitted edits | `ref` (op:"index_working_tree") |
+| Bind the session to the checkout's project | `init` (repository:"owner/name") |
+| Pin / unpin the session's project by hand | `ref` (op:"use_project", projectId; "clear_project" reverts) |
+| Create a project | `create_project` (mcp:admin) |
+| Attach a repository, public or private | `add_repository` (private: installation_id from `list_installations`) |
+| GitHub App installations and their repositories | `list_installations` |
 
 ## Branch awareness
 
@@ -216,10 +239,20 @@ Abridged; the full list lives in `init.usage.anti_patterns` and is enforced via
 
 ## Error envelopes
 
-You cannot attach repos, reindex, or change scope: those are dashboard actions the
-user does. Recognize the code, take the right local action, tell the user when they
-need to act.
+Attaching a repository, creating a project, and reindexing go through
+`add_repository` / `create_project` / `reindex_repository` and need an `mcp:admin`
+token; with a read-only token (`admin_scope_required`) those are dashboard actions
+the user does. Recognize the code, take the right local action, tell the user when
+they need to act.
 
+- `private_repository_needs_credential`: the repository is private (or does not
+  exist) and the workspace has nothing that can clone it. Call `list_installations`
+  and retry with a covering `installation_id`, or have the user connect the GitHub
+  App / save a PAT on the dashboard.
+- `installation_lacks_repository`: the named installation does not cover that
+  repository. Pick another from `list_installations` or have the user grant it on
+  GitHub.
+- `plan_limit_exceeded`: the plan's repository or project cap. Tell the user.
 - `repository_not_indexed`: not in the index yet. With a local clone, fall back to
   `Read` / `Grep`; note that cross-repo signals (callers, library catalog) are missing.
 - `stale_index`: indexed SHA behind live HEAD. Proceed against latest indexed and
