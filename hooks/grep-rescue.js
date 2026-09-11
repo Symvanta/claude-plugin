@@ -54,7 +54,9 @@ async function main() {
     const terms = lib.extractTerms(pattern);
     if (terms.length === 0) lib.done(HOOK, 'no-terms');
 
-    const repo = lib.repoInfo(ti.path, payload.cwd).repo;
+    const info = lib.repoInfo(ti.path, payload.cwd);
+    if (info.root && !info.repo) lib.done(HOOK, 'no-remote', false);
+    const repo = info.slug;
 
     const key = lib.cacheKey([HOOK, repo || '-', terms.join(',')]);
     const cached = lib.cacheGet(key);
@@ -65,11 +67,12 @@ async function main() {
 
     const auth = lib.loadAuth();
     if (!auth.token) lib.done(HOOK, `no-token:${auth.error || 'unknown'}`, { repo, terms });
+    const scope = await lib.checkoutScope(HOOK, auth, info);
 
     const t0 = Date.now();
     const query = terms.join(' ');
     const { value, aborted } = await lib.withBudget(BUDGET_MS, (signal) =>
-        lib.callTool(auth, 'locate', repo ? { query, repository: repo, limit: lib.MAX_ROWS } : { query, limit: lib.MAX_ROWS }, signal));
+        lib.callTool(auth, 'locate', scope ? { query, repository: scope, limit: lib.MAX_ROWS } : { query, limit: lib.MAX_ROWS }, signal));
     const matches = value && Array.isArray(value.matches) ? value.matches : [];
     const ms = Date.now() - t0;
     if (!aborted && value) lib.cacheSet(key, matches);

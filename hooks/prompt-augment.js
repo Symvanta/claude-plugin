@@ -32,7 +32,9 @@ async function main() {
     const terms = lib.promptTerms(prompt);
     if (terms.length === 0) lib.done(HOOK, 'no-terms');
 
-    const repo = lib.repoInfo(null, payload.cwd).repo;
+    const info = lib.repoInfo(null, payload.cwd);
+    if (info.root && !info.repo) lib.done(HOOK, 'no-remote', false);
+    const repo = info.slug;
 
     const key = lib.cacheKey([HOOK, repo || '-', terms.join(',')]);
     const cached = lib.cacheGet(key);
@@ -43,9 +45,10 @@ async function main() {
 
     const auth = lib.loadAuth();
     if (!auth.token) lib.done(HOOK, `no-token:${auth.error || 'unknown'}`, { repo, terms });
+    const scope = await lib.checkoutScope(HOOK, auth, info);
 
     const t0 = Date.now();
-    const { matches, aborted } = await lib.runDefinitionLookups(auth, repo, terms, BUDGET_MS);
+    const { matches, aborted } = await lib.runDefinitionLookups(auth, scope, terms, BUDGET_MS);
     const ms = Date.now() - t0;
     if (!aborted) lib.cacheSet(key, matches);
     if (matches.length === 0) lib.done(HOOK, aborted ? 'timeout' : 'no-matches', { repo, terms, cache: false, ms });

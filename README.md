@@ -91,11 +91,18 @@ downloaded but not active.
 The plugin executes small, readable Node hook scripts locally:
 
 - [`session-start.js`](hooks/session-start.js): prints standing context once at
-  the start of a session. Sends nothing anywhere.
+  the start of a session. Reads the checkout's git remote (`owner/name`) so it
+  can tell the agent to call `init` with `repository` set to it, which binds
+  the session to the project that holds this checkout instead of the
+  workspace default. Sends nothing anywhere.
 - The **augment hook family** (on by default): five hooks sharing one core
   ([`lib.js`](hooks/lib.js)). Each can only **add** context, never block:
   every error, timeout, or missing token is a clean pass-through, and the
-  intercepted tool always runs untouched.
+  intercepted tool always runs untouched. Every hook first checks that the
+  checkout it fires in is attached to a Symvanta project (one `init` call per
+  checkout per ten minutes, memoized); a checkout attached nowhere, or a git
+  checkout with no remote, keeps the hooks silent, so you never see another
+  codebase's symbols while working in an unindexed one.
   - [`grep-augment.js`](hooks/grep-augment.js): on `Grep`/`Glob`, looks up
     matching indexed symbol **definitions** (scoped to the repo you are
     searching, up to two identifiers from the pattern in parallel, 60s cache)
@@ -132,12 +139,14 @@ deliberately narrow and each script is short enough to audit in minutes:
 - That token is sent **only** to the Symvanta MCP server, the same place it
   was issued for.
 - What leaves the machine per lookup: extracted identifier **terms**, matched
-  **symbol names**, and repo-relative **file paths**. Never file contents, and
+  **symbol names**, repo-relative **file paths**, and the checkout's GitHub
+  remote as **`owner/name`** (the attachment check). Never file contents, and
   never your message text (the prompt hook sends at most two identifier
   tokens, not the prompt).
 - They write local files under `~/.symvanta/`, never uploaded anywhere:
   `grep-cache/` (the 60s result cache, one small file per key),
-  `repo-cache.json` (path-to-repo memo), `keychain-cache.json` (macOS only: a
+  `repo-cache.json` (path-to-repo memo), `workspace-cache.json` (per-checkout
+  attachment memo, 10 minutes), `keychain-cache.json` (macOS only: a
   5-minute memo of the Keychain read, so a busy session doesn't shell out to
   `security` on every tool call), `read-seen/` (per-session first-read
   markers), and `grep-augment.log` (one JSONL line per run: hook, terms, repo,

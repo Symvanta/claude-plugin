@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.0
+
+- The session is bound to the checkout you work in. The SessionStart primer
+  reads the checkout's GitHub remote and tells the agent to call `init` with
+  `repository: "owner/name"`; the server answers with the project that holds
+  that repository as the active project and pins the session to it, so calls
+  without `projectId` resolve there. `workspace.attached: false` means the
+  checkout is not indexed at all, and the primer now says so instead of "zero
+  repositories means not a Symvanta project", which was wrong whenever the
+  workspace had a default project full of some other codebase.
+- The augment hooks respect that verdict. A checkout whose remote is attached
+  to no project stays silent (previously every hook answered from the
+  workspace default project, so reading one codebase produced another
+  codebase's symbols), and so does a git checkout with no remote, which
+  Symvanta cannot index. The attachment answer is memoized per checkout root
+  for ten minutes (`~/.symvanta/workspace-cache.json`), never on a timeout, and
+  an older server without `init.repository` leaves the hooks on their previous
+  behaviour. Lookups now scope to the full `owner/name` slug instead of the
+  bare repository name. New outcomes in the local log: `no-remote`,
+  `unattached`.
+- New server tools the primer lists: `create_project`, `list_installations`,
+  and `add_repository` with `installation_id` for a private repository;
+  `ref` gains `op:"use_project"` / `op:"clear_project"`. `/symvanta:status`
+  passes the checkout remote to `init` and reports an unattached checkout.
+
 ## 1.4.0
 
 - New `bash-augment` hook (PreToolUse on Bash): when a Bash command is a code

@@ -56,12 +56,14 @@ async function main() {
         if (Date.now() - fs.statSync(seen).mtimeMs < SEEN_TTL_MS) lib.done(HOOK, 'seen', false);
     } catch { /* not seen yet */ }
 
-    const { repo, root } = lib.repoInfo(filePath, payload.cwd);
-    const rel = lib.repoRelative(filePath, root);
+    const info = lib.repoInfo(filePath, payload.cwd);
+    const repo = info.slug;
+    const rel = lib.repoRelative(filePath, info.root);
     if (!repo || !rel) lib.done(HOOK, 'no-repo', false);
 
     const auth = lib.loadAuth();
     if (!auth.token) lib.done(HOOK, `no-token:${auth.error || 'unknown'}`, { repo, file: rel });
+    await lib.checkoutScope(HOOK, auth, info);
 
     const t0 = Date.now();
     const key = lib.cacheKey([HOOK, repo, rel]);

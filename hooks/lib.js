@@ -165,10 +165,30 @@ function git(dir, args) {
     }).toString().trim();
 }
 
-// Repo name + checkout root for a path, derived from the git remote.
-// Memoized on disk because a miss costs one or two git subprocess spawns,
-// the slowest client-side step (especially on Windows). Negative results
-// (not a repo) are memoized too, so reads outside any checkout stay cheap.
+// "owner/name" from a git remote URL (https, ssh, scp-style, with or without
+// .git), or the bare last segment when no owner is visible. Mirrors the
+// server's normalizeRepositorySlug so init resolves the same repository the
+// hooks scope their lookups to.
+function remoteSlug(url) {
+    let s = String(url || '').trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+    const scp = s.match(/^[\w.-]+@[\w.-]+:(.+)$/);
+    if (scp) {
+        s = scp[1];
+    } else {
+        const m = s.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]+\/(.+)$/i);
+        if (m) s = m[1];
+    }
+    const parts = s.replace(/^\/+/, '').split('/').filter(Boolean);
+    if (parts.length >= 2) return `${parts[parts.length - 2]}/${parts[parts.length - 1]}`;
+    return parts[0] || null;
+}
+
+// Repo name, owner/name slug, and checkout root for a path, derived from the
+// git remote. Memoized on disk because a miss costs one or two git subprocess
+// spawns, the slowest client-side step (especially on Windows). Negative
+// results (not a repo) are memoized too, so reads outside any checkout stay
+// cheap. `root` set with `repo` null means a checkout with no remote, which
+// Symvanta cannot index; `root` null means not a git checkout at all.
 const REPO_MEMO_FILE = path.join(STATE_DIR, 'repo-cache.json');
 const REPO_MEMO_TTL_MS = 24 * 60 * 60 * 1000;
 function repoInfo(searchPath, cwd) {
@@ -178,31 +198,85 @@ function repoInfo(searchPath, cwd) {
             dir = fs.statSync(searchPath).isDirectory() ? searchPath : path.dirname(searchPath);
         }
     } catch { /* fall back to cwd */ }
-    if (!dir) return { repo: null, root: null };
+    if (!dir) return { repo: null, slug: null, root: null };
     let memo = {};
     try { memo = JSON.parse(fs.readFileSync(REPO_MEMO_FILE, 'utf8')) || {}; } catch { /* no memo yet */ }
     const hit = memo[dir];
-    if (hit && Date.now() - hit.t < REPO_MEMO_TTL_MS) return { repo: hit.repo, root: hit.root };
+    // Entries written before `slug` existed are recomputed once.
+    if (hit && 'slug' in hit && Date.now() - hit.t < REPO_MEMO_TTL_MS) return { repo: hit.repo, slug: hit.slug, root: hit.root };
     let repo = null;
+    let slug = null;
     let root = null;
     try {
         root = git(dir, ['rev-parse', '--show-toplevel']);
         const url = git(dir, ['config', '--get', 'remote.origin.url']);
-        const m = url.replace(/\.git$/, '').match(/([^/:]+)$/);
-        repo = m ? m[1] : null;
+        slug = remoteSlug(url);
+        repo = slug ? slug.slice(slug.lastIndexOf('/') + 1) : null;
     } catch { /* not a git checkout, or no remote */ }
     try {
         const now = Date.now();
         for (const k of Object.keys(memo)) {
             if (!memo[k] || now - memo[k].t >= REPO_MEMO_TTL_MS) delete memo[k];
         }
-        memo[dir] = { repo, root, t: now };
+        memo[dir] = { repo, slug, root, t: now };
         fs.mkdirSync(STATE_DIR, { recursive: true });
         const tmp = `${REPO_MEMO_FILE}.${process.pid}.tmp`;
         fs.writeFileSync(tmp, JSON.stringify(memo));
         fs.renameSync(tmp, REPO_MEMO_FILE);
     } catch { /* memo is best-effort */ }
-    return { repo, root };
+    return { repo, slug, root };
+}
+
+// Whether the checkout at `root` (remote `slug`) is attached to a project the
+// token can reach, asked through init({ repository }), which also binds the
+// session to that project server-side so the agent's own unscoped calls
+// follow the checkout the hooks touch. Memoized on disk per checkout root so
+// a burst of hooks costs one init per ten minutes, and never memoized on a
+// timeout or transport error (unknown is not "no"). Returns true, false, or
+// null when unknown (an older server without init.repository answers null
+// too, so the hooks keep today's behaviour there).
+const WORKSPACE_MEMO_FILE = path.join(STATE_DIR, 'workspace-cache.json');
+const WORKSPACE_MEMO_TTL_MS = 10 * 60 * 1000;
+async function workspaceAttached(auth, slug, root, budgetMs) {
+    if (!slug || !root) return null;
+    const key = String(root).toLowerCase();
+    let memo = {};
+    try { memo = JSON.parse(fs.readFileSync(WORKSPACE_MEMO_FILE, 'utf8')) || {}; } catch { /* no memo yet */ }
+    const hit = memo[key];
+    if (hit && hit.slug === slug && Date.now() - hit.t < WORKSPACE_MEMO_TTL_MS) return hit.attached;
+    const { value, aborted } = await withBudget(budgetMs, (signal) => callTool(auth, 'init', { repository: slug }, signal));
+    const ws = value && value.workspace;
+    if (aborted || !ws || typeof ws.attached !== 'boolean') return null;
+    try {
+        const now = Date.now();
+        for (const k of Object.keys(memo)) {
+            if (!memo[k] || now - memo[k].t >= WORKSPACE_MEMO_TTL_MS) delete memo[k];
+        }
+        memo[key] = { slug, attached: ws.attached, t: now };
+        fs.mkdirSync(STATE_DIR, { recursive: true });
+        const tmp = `${WORKSPACE_MEMO_FILE}.${process.pid}.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify(memo));
+        fs.renameSync(tmp, WORKSPACE_MEMO_FILE);
+    } catch { /* memo is best-effort */ }
+    return ws.attached;
+}
+
+// The checkout gate every augment hook runs before its lookup, once it holds a
+// token. A git checkout with no remote (root set, repo null) cannot be
+// indexed, so the hook stays silent instead of asking the workspace default
+// project about an unrelated tree. A remote that init says is attached
+// nowhere is silent too: that is the citedlink case, where every hook fired
+// against another project's symbols. Not a checkout at all (root null) keeps
+// the unscoped lookup: a workspace root holding several checkouts is the
+// common shape. Returns the `repository` selector for the tools (the
+// owner/name slug), or null for an unscoped lookup.
+const ATTACH_BUDGET_MS = 800;
+async function checkoutScope(hook, auth, info) {
+    if (info.root && !info.repo) done(hook, 'no-remote', { root: info.root });
+    if (!info.slug) return null;
+    const attached = await workspaceAttached(auth, info.slug, info.root, budget(ATTACH_BUDGET_MS));
+    if (attached === false) done(hook, 'unattached', { repo: info.slug });
+    return info.slug;
 }
 
 // Repo-relative logical path (forward slashes) for an absolute path, or null
@@ -496,7 +570,10 @@ module.exports = {
     CODE_EXT,
     extractTerms,
     promptTerms,
+    remoteSlug,
     repoInfo,
+    workspaceAttached,
+    checkoutScope,
     repoRelative,
     cacheKey,
     cacheGet,

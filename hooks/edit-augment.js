@@ -39,8 +39,9 @@ async function main() {
     const ext = String(filePath).split('.').pop().toLowerCase();
     if (!lib.CODE_EXT.has(ext)) lib.done(HOOK, 'non-code', false);
 
-    const { repo, root } = lib.repoInfo(filePath, payload.cwd);
-    const rel = lib.repoRelative(filePath, root);
+    const info = lib.repoInfo(filePath, payload.cwd);
+    const repo = info.slug;
+    const rel = lib.repoRelative(filePath, info.root);
     if (!repo || !rel) lib.done(HOOK, 'no-repo', false);
 
     const isWrite = tool === 'Write';
@@ -55,6 +56,7 @@ async function main() {
 
     const auth = lib.loadAuth();
     if (!auth.token) lib.done(HOOK, `no-token:${auth.error || 'unknown'}`, { repo, file: rel });
+    await lib.checkoutScope(HOOK, auth, info);
 
     const t0 = Date.now();
 
