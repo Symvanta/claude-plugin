@@ -187,27 +187,27 @@ short-circuits before anything is read or sent.
 
 ```mermaid
 flowchart TD
-    A[Agent runs Grep or Glob] --> B{{Claude Code fires the PreToolUse hook}}
-    B --> D{SYMVANTA_GREP_AUGMENT = off?}
-    D -->|yes| RUN[Grep/Glob runs normally; results unchanged]
-    D -->|no, default| TX[Extract up to 2 identifiers from the pattern; derive the repo from the search path]
-    TX --> CACHE{Fresh 60s cache hit?}
-    CACHE -->|yes| F[Format matching definitions as additionalContext]
-    CACHE -->|no| TOK[Token: SYMVANTA_MCP_TOKEN, else the stored Symvanta token from ~/.claude/.credentials.json (macOS: login Keychain)]
-    TOK --> C[quick_lookup per term, in parallel, repo-scoped, hard cap 1.5s; falls back to locate mode:symbol]
+    A["Agent runs Grep or Glob"] --> B{{"Claude Code fires the PreToolUse hook"}}
+    B --> D{"SYMVANTA_GREP_AUGMENT = off?"}
+    D -->|yes| RUN["Grep/Glob runs normally; results unchanged"]
+    D -->|no, default| TX["Extract up to 2 identifiers from the pattern; derive the repo from the search path"]
+    TX --> CACHE{"Fresh 60s cache hit?"}
+    CACHE -->|yes| F["Format matching definitions as additionalContext"]
+    CACHE -->|no| TOK["Token: SYMVANTA_MCP_TOKEN, else the stored Symvanta token from ~/.claude/.credentials.json (macOS: login Keychain)"]
+    TOK --> C["quick_lookup per term, in parallel, repo-scoped, hard cap 1.5s; falls back to locate mode:symbol"]
 
     subgraph cloud["Symvanta cloud (only the search TERMs leave your machine)"]
-        C --> M[mcp.symvanta.com]
-        M --> DB[(Code graph in Postgres)]
+        C --> M["mcp.symvanta.com"]
+        M --> DB[("Code graph in Postgres")]
         DB --> M
     end
 
-    C --> OK{Token valid and matches, in time?}
-    OK -->|no, error, or timeout| LOG[Append one line to ~/.symvanta/grep-augment.log]
-    OK -->|yes| CW[Cache for 60s] --> F
-    F --> EM[Emit JSON to Claude Code] --> LOG
+    C --> OK{"Token valid and matches, in time?"}
+    OK -->|no, error, or timeout| LOG["Append one line to ~/.symvanta/grep-augment.log"]
+    OK -->|yes| CW["Cache for 60s"] --> F
+    F --> EM["Emit JSON to Claude Code"] --> LOG
     LOG --> RUN
-    RUN --> O[Agent sees its grep results PLUS the Symvanta definitions, then reaches for find_node / relate / ask_codebase]
+    RUN --> O["Agent sees its grep results PLUS the Symvanta definitions, then reaches for find_node / relate / ask_codebase"]
 ```
 
 ## Uninstall
